@@ -2,24 +2,24 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { 
-  collection, 
-  addDoc, 
+import {
+  collection,
+  addDoc,
   serverTimestamp,
   doc,
   getDoc,
-  setDoc
+  setDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { 
-  Layers, 
-  Plus, 
-  Trash2, 
-  Play, 
-  Search, 
+import {
+  Layers,
+  Plus,
+  Trash2,
+  Play,
+  Search,
   AlertCircle,
   HelpCircle,
-  Activity
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -53,7 +53,7 @@ let idCounter = 0;
 
 export default function MultiOrderPage() {
   const { apiKey, user } = useAuth();
-  
+
   // SMM Panel Services
   const [services, setServices] = useState<SMMService[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -74,12 +74,24 @@ export default function MultiOrderPage() {
     setConsoleLogs((prev) => [...prev, log]);
   };
 
+  const clampQty = (qty: any, minStr: string, maxStr: string): number => {
+    const minVal = Number(minStr) || 10;
+    const maxVal = Number(maxStr) || Infinity;
+    let val = Number(qty);
+    if (isNaN(val) || val < minVal) return minVal;
+    if (val > maxVal) return maxVal;
+    return val;
+  };
+
   // Helper to compute order quantity for a campaign item
   const getItemQty = (item: CampaignItem): number => {
     const typeLower = item.service.type.toLowerCase();
+    const minStr = item.service.min;
+    const maxStr = item.service.max;
+
     // IMPORTANT: check "comment likes" BEFORE "comments" to avoid substring collision
     if (typeLower.includes("comment likes")) {
-      return Number(item.quantity) || 100;
+      return clampQty(item.quantity, minStr, maxStr);
     } else if (typeLower.includes("comments")) {
       // Comments type: each non-empty line is one comment sent
       const commentsList = item.comments
@@ -87,16 +99,16 @@ export default function MultiOrderPage() {
         : [];
       return commentsList.length || 1;
     } else if (typeLower.includes("mentions")) {
-      return Number(item.quantity) || 100;
+      return clampQty(item.quantity, minStr, maxStr);
     } else if (typeLower.includes("poll")) {
-      return Number(item.quantity) || 100;
+      return clampQty(item.quantity, minStr, maxStr);
     } else if (typeLower.includes("package")) {
       return 1;
     } else {
       // Default / Drip-feed:
       // For drip-feed the API receives quantity-per-run; billing is also per-run quantity.
       // Do NOT multiply by runs here — that would inflate the displayed cost.
-      return Number(item.quantity) || 100;
+      return clampQty(item.quantity, minStr, maxStr);
     }
   };
 
@@ -114,7 +126,7 @@ export default function MultiOrderPage() {
 
   const totalINRCost = campaignItems.reduce(
     (sum, item) => sum + getItemCostINR(item),
-    0
+    0,
   );
 
   // Fetch services list
@@ -128,20 +140,27 @@ export default function MultiOrderPage() {
         const cacheDocRef = doc(db, "services_cache", "global_catalog");
         let useCache = false;
         let cachedData: SMMService[] = [];
-        
+
         try {
           const cacheDocSnap = await getDoc(cacheDocRef);
           if (cacheDocSnap.exists()) {
             const cacheDocData = cacheDocSnap.data();
             const updatedAt = cacheDocData.updatedAt;
-            if (updatedAt && Array.isArray(cacheDocData.services) && cacheDocData.services.length > 0) {
-              const updatedAtMs = typeof updatedAt.toMillis === "function"
-                ? updatedAt.toMillis()
-                : (updatedAt.seconds ? updatedAt.seconds * 1000 : Number(updatedAt));
-              
+            if (
+              updatedAt &&
+              Array.isArray(cacheDocData.services) &&
+              cacheDocData.services.length > 0
+            ) {
+              const updatedAtMs =
+                typeof updatedAt.toMillis === "function"
+                  ? updatedAt.toMillis()
+                  : updatedAt.seconds
+                    ? updatedAt.seconds * 1000
+                    : Number(updatedAt);
+
               const ageMs = Date.now() - updatedAtMs;
               const twelveHoursMs = 12 * 60 * 60 * 1000;
-              
+
               if (ageMs < twelveHoursMs) {
                 useCache = true;
                 cachedData = cacheDocData.services;
@@ -149,7 +168,10 @@ export default function MultiOrderPage() {
             }
           }
         } catch (cacheErr) {
-          console.warn("Failed to fetch services list from cache, falling back to API:", cacheErr);
+          console.warn(
+            "Failed to fetch services list from cache, falling back to API:",
+            cacheErr,
+          );
         }
 
         if (useCache) {
@@ -163,7 +185,11 @@ export default function MultiOrderPage() {
             return igRegex.test(normalized);
           });
           setServices(igData);
-          const cats = Array.from(new Set(igData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
+          const cats = Array.from(
+            new Set(
+              igData.map((s: SMMService) => s.category || "Uncategorized"),
+            ),
+          ) as string[];
           setCategories(cats.sort());
           if (cats.length > 0) {
             setSelectedCategory(cats[0]);
@@ -179,7 +205,7 @@ export default function MultiOrderPage() {
           body: JSON.stringify({ action: "services", key: apiKey }),
         });
         const data = await res.json();
-        
+
         if (Array.isArray(data)) {
           // Filter for Instagram services only (case-insensitive with Unicode normalization and word boundary boundaries)
           const igData = data.filter((s: SMMService) => {
@@ -192,7 +218,11 @@ export default function MultiOrderPage() {
           });
           setServices(igData);
           // Extract unique categories
-          const cats = Array.from(new Set(igData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
+          const cats = Array.from(
+            new Set(
+              igData.map((s: SMMService) => s.category || "Uncategorized"),
+            ),
+          ) as string[];
           setCategories(cats.sort());
           if (cats.length > 0) {
             setSelectedCategory(cats[0]);
@@ -200,15 +230,24 @@ export default function MultiOrderPage() {
 
           // Save to Firestore Cache asynchronously without blocking UI update
           try {
-            await setDoc(cacheDocRef, {
-              services: data,
-              updatedAt: serverTimestamp()
-            }, { merge: true });
+            await setDoc(
+              cacheDocRef,
+              {
+                services: data,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
           } catch (writeErr) {
-            console.error("Failed to write services list to Firestore cache:", writeErr);
+            console.error(
+              "Failed to write services list to Firestore cache:",
+              writeErr,
+            );
           }
         } else {
-          setFetchError(data?.error || "Failed to load services list from SMM API.");
+          setFetchError(
+            data?.error || "Failed to load services list from SMM API.",
+          );
         }
       } catch (err) {
         console.error("Error loading SMM services:", err);
@@ -229,7 +268,8 @@ export default function MultiOrderPage() {
             Campaign Creator
           </h1>
           <p className="text-sm text-slate-450 mt-1">
-            Configure and execute SMM orders for multiple services simultaneously
+            Configure and execute SMM orders for multiple services
+            simultaneously
           </p>
         </div>
         <div className="bg-cyber-card border border-cyber-red/20 rounded-xl p-8 text-center space-y-4 shadow-lg">
@@ -238,7 +278,8 @@ export default function MultiOrderPage() {
             API Key Required
           </h2>
           <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-            You must configure a valid SMM API key in your settings before you can create and launch campaigns.
+            You must configure a valid SMM API key in your settings before you
+            can create and launch campaigns.
           </p>
           <Link
             href="/dashboard/settings"
@@ -253,9 +294,11 @@ export default function MultiOrderPage() {
 
   // Filter services by Category and Search query
   const filteredServices = services.filter((s) => {
-    const matchesCat = selectedCategory ? s.category === selectedCategory : true;
+    const matchesCat = selectedCategory
+      ? s.category === selectedCategory
+      : true;
     const matchesSearch = searchQuery
-      ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.service.toString().includes(searchQuery)
       : true;
     return matchesCat && matchesSearch;
@@ -272,24 +315,54 @@ export default function MultiOrderPage() {
       answer_number: "1",
       dripEnabled: false,
       runs: 10,
-      interval: 60
+      interval: 60,
     };
     setCampaignItems((prev) => [...prev, newItem]);
     addLog(`Added: ${service.name} (#${service.service})`);
   };
 
   const removeFromCampaign = (id: string) => {
-    const item = campaignItems.find(i => i.id === id);
+    const item = campaignItems.find((i) => i.id === id);
     if (item) {
       addLog(`Removed: ${item.service.name}`);
     }
     setCampaignItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const updateItemField = (id: string, field: keyof CampaignItem, value: string | number | boolean) => {
+  const updateItemField = (
+    id: string,
+    field: keyof CampaignItem,
+    value: string | number | boolean,
+  ) => {
     setCampaignItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
     );
+  };
+
+  const handleQtyChange = (id: string, valueStr: string, maxStr: string) => {
+    if (valueStr === "") {
+      updateItemField(id, "quantity", "");
+      return;
+    }
+    const val = Number(valueStr);
+    const maxVal = Number(maxStr) || Infinity;
+    if (val > maxVal) {
+      updateItemField(id, "quantity", maxVal);
+    } else {
+      updateItemField(id, "quantity", val);
+    }
+  };
+
+  const handleQtyBlur = (id: string, value: number | string, minStr: string, maxStr: string) => {
+    const minVal = Number(minStr) || 10;
+    const maxVal = Number(maxStr) || Infinity;
+    let val = Number(value);
+    if (isNaN(val) || val < minVal) {
+      val = minVal;
+    } else if (val > maxVal) {
+      val = maxVal;
+    }
+    updateItemField(id, "quantity", val);
   };
 
   // Place SMM Campaign orders
@@ -307,7 +380,7 @@ export default function MultiOrderPage() {
 
     setExecuting(true);
     const batchId = Math.random().toString(36).substring(2, 11).toUpperCase();
-    
+
     addLog(`Starting batch ${batchId}...`);
     addLog(`Target: ${targetLink}`);
 
@@ -318,7 +391,7 @@ export default function MultiOrderPage() {
       const item = campaignItems[idx];
       const s = item.service;
       const stepNum = idx + 1;
-      
+
       addLog(`[${stepNum}/${campaignItems.length}] Processing ${s.name}...`);
 
       // Prepare SMM payload based on service type
@@ -334,17 +407,17 @@ export default function MultiOrderPage() {
       if (typeLower.includes("comments")) {
         payload.comments = item.comments || "";
       } else if (typeLower.includes("mentions")) {
-        payload.quantity = Number(item.quantity) || 100;
+        payload.quantity = clampQty(item.quantity, s.min, s.max);
         payload.usernames = item.usernames || "";
       } else if (typeLower.includes("comment likes")) {
-        payload.quantity = Number(item.quantity) || 100;
+        payload.quantity = clampQty(item.quantity, s.min, s.max);
         payload.username = item.username || "";
       } else if (typeLower.includes("poll")) {
-        payload.quantity = Number(item.quantity) || 100;
+        payload.quantity = clampQty(item.quantity, s.min, s.max);
         payload.answer_number = item.answer_number || "1";
       } else if (typeLower.includes("package")) {
       } else {
-        payload.quantity = Number(item.quantity) || 100;
+        payload.quantity = clampQty(item.quantity, s.min, s.max);
         if (item.dripEnabled) {
           payload.runs = Number(item.runs) || 10;
           payload.interval = Number(item.interval) || 60;
@@ -394,9 +467,11 @@ export default function MultiOrderPage() {
       }
     }
 
-    addLog(`Summary: Finished. Success: ${successCount}, Failed: ${failedCount}`);
+    addLog(
+      `Summary: Finished. Success: ${successCount}, Failed: ${failedCount}`,
+    );
     setExecuting(false);
-    
+
     if (successCount > 0) {
       setCampaignItems([]);
       alert(`Campaign Complete! Placed ${successCount} orders successfully.`);
@@ -413,15 +488,14 @@ export default function MultiOrderPage() {
           Place Campaign Orders
         </h1>
         <p className="text-sm text-slate-450 mt-1">
-          Configure SMM orders for multiple services and execute them simultaneously.
+          Configure SMM orders for multiple services and execute them
+          simultaneously.
         </p>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-6 items-start">
-        
         {/* Left Side: Campaign builder & services selection (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
-          
           {/* Target link Input */}
           <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-green"></div>
@@ -460,9 +534,12 @@ export default function MultiOrderPage() {
             {campaignItems.length === 0 ? (
               <div className="text-center py-12 space-y-3">
                 <HelpCircle className="w-10 h-10 text-slate-550 mx-auto animate-pulse" />
-                <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Your basket is empty</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
+                  Your basket is empty
+                </p>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  Select a category in the catalog below, find services, and click &quot;+&quot; to add them to your campaign basket.
+                  Select a category in the catalog below, find services, and
+                  click &quot;+&quot; to add them to your campaign basket.
                 </p>
               </div>
             ) : (
@@ -470,10 +547,10 @@ export default function MultiOrderPage() {
                 {campaignItems.map((item) => {
                   const s = item.service;
                   const typeLower = s.type.toLowerCase();
-                  
+
                   return (
-                    <div 
-                      key={item.id} 
+                    <div
+                      key={item.id}
                       className="bg-cyber-input/40 border border-cyber-border rounded-lg p-4.5 relative flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all"
                     >
                       {/* Left info */}
@@ -485,8 +562,14 @@ export default function MultiOrderPage() {
                           {s.name}
                         </h3>
                         <div className="text-xs text-slate-455">
-                          Type: <span className="text-cyber-blue font-semibold">{s.type}</span> | 
-                          Rate: <span className="text-cyber-green font-semibold">₹{s.rate}/1k</span>
+                          Type:{" "}
+                          <span className="text-cyber-blue font-semibold">
+                            {s.type}
+                          </span>{" "}
+                          | Rate:{" "}
+                          <span className="text-cyber-green font-semibold">
+                            ₹{s.rate}/1k
+                          </span>
                         </div>
                         <div className="text-[11px] text-slate-500 font-mono">
                           Est. cost:{" "}
@@ -498,7 +581,6 @@ export default function MultiOrderPage() {
 
                       {/* Middle: Dynamic Inputs based on type */}
                       <div className="flex-1 max-w-xs">
-                        
                         {/* Custom Comments Form */}
                         {typeLower.includes("comments") && (
                           <div className="space-y-1.5">
@@ -510,7 +592,13 @@ export default function MultiOrderPage() {
                               placeholder="Great!&#10;Nice photo!&#10;Incredible!"
                               className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyber-purple transition-all"
                               value={item.comments || ""}
-                              onChange={(e) => updateItemField(item.id, "comments", e.target.value)}
+                              onChange={(e) =>
+                                updateItemField(
+                                  item.id,
+                                  "comments",
+                                  e.target.value,
+                                )
+                              }
                               disabled={executing}
                             />
                           </div>
@@ -521,29 +609,55 @@ export default function MultiOrderPage() {
                           <div className="space-y-3.5">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">
+                                  Quantity
+                                </label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
                                   className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
-                                  value={item.quantity || 100}
-                                  onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
+                                  value={item.quantity ?? ""}
+                                  onChange={(e) =>
+                                    handleQtyChange(
+                                      item.id,
+                                      e.target.value,
+                                      s.max,
+                                    )
+                                  }
+                                  onBlur={(e) =>
+                                    handleQtyBlur(
+                                      item.id,
+                                      e.target.value,
+                                      s.min,
+                                      s.max,
+                                    )
+                                  }
                                   disabled={executing}
                                 />
                               </div>
                               <div className="flex items-end">
-                                <span className="text-[10px] text-slate-500 font-semibold font-mono">Min: {s.min} | Max: {s.max}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold font-mono">
+                                  Min: {s.min} | Max: {s.max}
+                                </span>
                               </div>
                             </div>
                             <div>
-                              <label className="text-xs text-slate-400 font-semibold block">Usernames (one username per line)</label>
+                              <label className="text-xs text-slate-400 font-semibold block">
+                                Usernames (one username per line)
+                              </label>
                               <textarea
                                 rows={2}
                                 placeholder="user1&#10;user2"
                                 className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyber-purple transition-all"
                                 value={item.usernames || ""}
-                                onChange={(e) => updateItemField(item.id, "usernames", e.target.value)}
+                                onChange={(e) =>
+                                  updateItemField(
+                                    item.id,
+                                    "usernames",
+                                    e.target.value,
+                                  )
+                                }
                                 disabled={executing}
                               />
                             </div>
@@ -555,29 +669,55 @@ export default function MultiOrderPage() {
                           <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">
+                                  Quantity
+                                </label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
                                   className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
-                                  value={item.quantity || 100}
-                                  onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
+                                  value={item.quantity ?? ""}
+                                  onChange={(e) =>
+                                    handleQtyChange(
+                                      item.id,
+                                      e.target.value,
+                                      s.max,
+                                    )
+                                  }
+                                  onBlur={(e) =>
+                                    handleQtyBlur(
+                                      item.id,
+                                      e.target.value,
+                                      s.min,
+                                      s.max,
+                                    )
+                                  }
                                   disabled={executing}
                                 />
                               </div>
                               <div className="flex items-end">
-                                <span className="text-[10px] text-slate-500 font-semibold font-mono">Min: {s.min}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold font-mono">
+                                  Min: {s.min}
+                                </span>
                               </div>
                             </div>
                             <div>
-                              <label className="text-xs text-slate-400 font-semibold block">Comment Username</label>
+                              <label className="text-xs text-slate-400 font-semibold block">
+                                Comment Username
+                              </label>
                               <input
                                 type="text"
                                 placeholder="username"
                                 className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                 value={item.username || ""}
-                                onChange={(e) => updateItemField(item.id, "username", e.target.value)}
+                                onChange={(e) =>
+                                  updateItemField(
+                                    item.id,
+                                    "username",
+                                    e.target.value,
+                                  )
+                                }
                                 disabled={executing}
                               />
                             </div>
@@ -589,25 +729,49 @@ export default function MultiOrderPage() {
                           <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">
+                                  Quantity
+                                </label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
                                   className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
-                                  value={item.quantity || 100}
-                                  onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
+                                  value={item.quantity ?? ""}
+                                  onChange={(e) =>
+                                    handleQtyChange(
+                                      item.id,
+                                      e.target.value,
+                                      s.max,
+                                    )
+                                  }
+                                  onBlur={(e) =>
+                                    handleQtyBlur(
+                                      item.id,
+                                      e.target.value,
+                                      s.min,
+                                      s.max,
+                                    )
+                                  }
                                   disabled={executing}
                                 />
                               </div>
                               <div>
-                                <label className="text-xs text-slate-400 font-semibold block">Answer (Option #)</label>
+                                <label className="text-xs text-slate-400 font-semibold block">
+                                  Answer (Option #)
+                                </label>
                                 <input
                                   type="text"
                                   placeholder="e.g. 1"
                                   className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.answer_number || "1"}
-                                  onChange={(e) => updateItemField(item.id, "answer_number", e.target.value)}
+                                  onChange={(e) =>
+                                    updateItemField(
+                                      item.id,
+                                      "answer_number",
+                                      e.target.value,
+                                    )
+                                  }
                                   disabled={executing}
                                 />
                               </div>
@@ -618,76 +782,114 @@ export default function MultiOrderPage() {
                         {/* Package Type (No inputs) */}
                         {typeLower.includes("package") && (
                           <div className="text-xs text-slate-500 italic">
-                            No additional parameters needed for this service package.
+                            No additional parameters needed for this service
+                            package.
                           </div>
                         )}
 
                         {/* Default SMM Type */}
-                        {!typeLower.includes("comments") && 
-                         !typeLower.includes("mentions") && 
-                         !typeLower.includes("comment likes") && 
-                         !typeLower.includes("poll") && 
-                         !typeLower.includes("package") && (
-                          <div className="space-y-3.5 font-sans">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
-                                <input
-                                  type="number"
-                                  min={s.min}
-                                  max={s.max}
-                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
-                                  value={item.quantity || 100}
-                                  onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
-                                  disabled={executing}
-                                />
-                              </div>
-                              <div className="flex items-end text-[10px] text-slate-550 leading-normal font-semibold font-mono">
-                                Min: {s.min} <br/> Max: {s.max}
-                              </div>
-                            </div>
-                            
-                            {/* Drip-Feed Option */}
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-xs text-slate-400 font-semibold cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  className="accent-cyber-purple w-4 h-4 rounded"
-                                  checked={item.dripEnabled || false}
-                                  onChange={(e) => updateItemField(item.id, "dripEnabled", e.target.checked)}
-                                  disabled={executing}
-                                />
-                                Enable Drip-Feed
-                              </label>
-                              
-                              {item.dripEnabled && (
-                                <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-cyber-card rounded-lg border border-cyber-border transition-all">
-                                  <div>
-                                    <label className="text-[10px] text-slate-500 uppercase block font-bold">Runs</label>
-                                    <input
-                                      type="number"
-                                      className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
-                                      value={item.runs || 10}
-                                      onChange={(e) => updateItemField(item.id, "runs", Number(e.target.value))}
-                                      disabled={executing}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] text-slate-500 uppercase block font-bold">Interval (min)</label>
-                                    <input
-                                      type="number"
-                                      className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
-                                      value={item.interval || 60}
-                                      onChange={(e) => updateItemField(item.id, "interval", Number(e.target.value))}
-                                      disabled={executing}
-                                    />
-                                  </div>
+                        {!typeLower.includes("comments") &&
+                          !typeLower.includes("mentions") &&
+                          !typeLower.includes("comment likes") &&
+                          !typeLower.includes("poll") &&
+                          !typeLower.includes("package") && (
+                            <div className="space-y-3.5 font-sans">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-xs text-slate-400 font-semibold block">
+                                    Quantity
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={s.min}
+                                    max={s.max}
+                                    className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
+                                    value={item.quantity ?? ""}
+                                    onChange={(e) =>
+                                      handleQtyChange(
+                                        item.id,
+                                        e.target.value,
+                                        s.max,
+                                      )
+                                    }
+                                    onBlur={(e) =>
+                                      handleQtyBlur(
+                                        item.id,
+                                        e.target.value,
+                                        s.min,
+                                        s.max,
+                                      )
+                                    }
+                                    disabled={executing}
+                                  />
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                                <div className="flex items-end text-[10px] text-slate-550 leading-normal font-semibold font-mono">
+                                  Min: {s.min} <br /> Max: {s.max}
+                                </div>
+                              </div>
 
+                              {/* Drip-Feed Option */}
+                              <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-xs text-slate-400 font-semibold cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-cyber-purple w-4 h-4 rounded"
+                                    checked={item.dripEnabled || false}
+                                    onChange={(e) =>
+                                      updateItemField(
+                                        item.id,
+                                        "dripEnabled",
+                                        e.target.checked,
+                                      )
+                                    }
+                                    disabled={executing}
+                                  />
+                                  Enable Drip-Feed
+                                </label>
+
+                                {item.dripEnabled && (
+                                  <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-cyber-card rounded-lg border border-cyber-border transition-all">
+                                    <div>
+                                      <label className="text-[10px] text-slate-500 uppercase block font-bold">
+                                        Runs
+                                      </label>
+                                      <input
+                                        type="number"
+                                        className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
+                                        value={item.runs || 10}
+                                        onChange={(e) =>
+                                          updateItemField(
+                                            item.id,
+                                            "runs",
+                                            Number(e.target.value),
+                                          )
+                                        }
+                                        disabled={executing}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] text-slate-500 uppercase block font-bold">
+                                        Interval (min)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
+                                        value={item.interval || 60}
+                                        onChange={(e) =>
+                                          updateItemField(
+                                            item.id,
+                                            "interval",
+                                            Number(e.target.value),
+                                          )
+                                        }
+                                        disabled={executing}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                       </div>
 
                       {/* Right: Delete button */}
@@ -718,7 +920,8 @@ export default function MultiOrderPage() {
                     </>
                   ) : (
                     <>
-                      Submit Campaign Orders — ₹{totalINRCost.toFixed(2)} ({campaignItems.length} services)
+                      Submit Campaign Orders — ₹{totalINRCost.toFixed(2)} (
+                      {campaignItems.length} services)
                       <Play className="w-4 h-4 fill-black text-black" />
                     </>
                   )}
@@ -730,7 +933,7 @@ export default function MultiOrderPage() {
           {/* SMM Services Selector Explorer */}
           <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
-            
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border pb-4 mb-4">
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
                 Service Catalog
@@ -778,20 +981,28 @@ export default function MultiOrderPage() {
             ) : (
               <div className="max-h-[350px] overflow-y-auto border border-cyber-border rounded-lg bg-cyber-bg/40 divide-y divide-cyber-border">
                 {filteredServices.map((s) => (
-                  <div 
-                    key={s.service} 
+                  <div
+                    key={s.service}
                     className="p-3.5 flex items-center justify-between hover:bg-slate-800/10 transition-colors"
                   >
                     <div className="space-y-1 pr-4 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-cyber-blue font-semibold font-mono">#{s.service}</span>
+                        <span className="text-xs text-cyber-blue font-semibold font-mono">
+                          #{s.service}
+                        </span>
                         <span className="text-[9px] bg-cyber-border text-slate-400 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
                           {s.type}
                         </span>
                       </div>
-                      <h4 className="text-xs text-white font-bold leading-normal">{s.name}</h4>
+                      <h4 className="text-xs text-white font-bold leading-normal">
+                        {s.name}
+                      </h4>
                       <p className="text-[11px] text-slate-500 font-mono">
-                        Rate: <span className="text-cyber-green font-semibold">₹{s.rate}/1k</span> | Min: {s.min} | Max: {s.max}
+                        Rate:{" "}
+                        <span className="text-cyber-green font-semibold">
+                          ₹{s.rate}/1k
+                        </span>{" "}
+                        | Min: {s.min} | Max: {s.max}
                       </p>
                     </div>
                     <button
@@ -807,7 +1018,6 @@ export default function MultiOrderPage() {
               </div>
             )}
           </div>
-
         </div>
 
         {/* Right Side: Active campaign Console Logger (4 cols) */}
@@ -817,10 +1027,12 @@ export default function MultiOrderPage() {
               <div className="flex items-center justify-between border-b border-cyber-border pb-3 mb-3">
                 <div className="flex items-center gap-2.5">
                   <Activity className="w-4.5 h-4.5 text-cyber-green animate-pulse" />
-                  <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">Campaign Execution Status</span>
+                  <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">
+                    Campaign Execution Status
+                  </span>
                 </div>
                 {consoleLogs.length > 1 && (
-                  <button 
+                  <button
                     onClick={() => setConsoleLogs(["Logs cleared. Ready."])}
                     className="text-xs text-slate-500 hover:text-slate-355 uppercase font-semibold transition-all"
                   >
@@ -836,14 +1048,21 @@ export default function MultiOrderPage() {
                 ))}
               </div>
             </div>
-            
+
             <div className="border-t border-cyber-border pt-4 mt-4 text-xs text-slate-550 shrink-0 space-y-1 font-semibold">
-              <p>Status: <span className="text-cyber-purple uppercase">Ready</span></p>
-              <p>Selected: <span className="text-cyber-green">{campaignItems.length} services in basket</span></p>
+              <p>
+                Status:{" "}
+                <span className="text-cyber-purple uppercase">Ready</span>
+              </p>
+              <p>
+                Selected:{" "}
+                <span className="text-cyber-green">
+                  {campaignItems.length} services in basket
+                </span>
+              </p>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

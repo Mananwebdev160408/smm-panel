@@ -4,13 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { 
-  LayoutDashboard, 
-  Layers, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Layers,
+  Settings,
+  LogOut,
   RefreshCw,
-  Activity
+  Activity,
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -90,7 +90,9 @@ export default function DashboardLayout({
       <div className="flex h-screen w-screen items-center justify-center bg-cyber-bg font-sans text-cyber-purple">
         <div className="text-center space-y-4">
           <div className="h-12 w-12 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="animate-pulse text-base tracking-wide text-slate-300">Loading dashboard...</p>
+          <p className="animate-pulse text-base tracking-wide text-slate-300">
+            Loading dashboard...
+          </p>
         </div>
       </div>
     );
@@ -111,7 +113,10 @@ export default function DashboardLayout({
           <div className="h-16 flex items-center px-6 border-b border-cyber-border justify-between">
             <Link href="/dashboard" className="flex items-center gap-1">
               <span className="text-lg font-extrabold tracking-tight text-white">
-                BuzzPlus<span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">SMM</span>
+                BuzzPlus
+                <span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">
+                  SMM
+                </span>
               </span>
             </Link>
             <div className="flex items-center gap-1.5 bg-cyber-green/10 border border-cyber-green/20 px-2 py-0.5 rounded text-[10px] text-cyber-green font-semibold uppercase">
@@ -140,7 +145,9 @@ export default function DashboardLayout({
                     className="text-cyber-blue hover:text-cyber-green transition-colors disabled:opacity-50"
                     title="Refresh Balance"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${balanceLoading ? "animate-spin" : ""}`} />
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 ${balanceLoading ? "animate-spin" : ""}`}
+                    />
                   </button>
                 )}
               </div>
@@ -153,7 +160,9 @@ export default function DashboardLayout({
                 ) : balance !== null ? (
                   <div className="text-lg font-bold text-cyber-green glow-green flex items-baseline gap-1">
                     $ {balance}
-                    <span className="text-[10px] text-slate-400 font-normal">{currency}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {currency}
+                    </span>
                   </div>
                 ) : (
                   <div className="text-xs text-slate-500 animate-pulse">
@@ -189,7 +198,9 @@ export default function DashboardLayout({
                   {isActive && (
                     <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-cyber-purple rounded-r"></span>
                   )}
-                  <Icon className={`w-4.5 h-4.5 ${isActive ? "text-cyber-purple" : "text-slate-400 group-hover:text-white"}`} />
+                  <Icon
+                    className={`w-4.5 h-4.5 ${isActive ? "text-cyber-purple" : "text-slate-400 group-hover:text-white"}`}
+                  />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -216,7 +227,10 @@ export default function DashboardLayout({
           {/* On mobile: show Brand logo */}
           <div className="flex items-center gap-1 lg:hidden">
             <span className="text-base font-extrabold tracking-tight text-white">
-              BuzzPlus<span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">SMM</span>
+              BuzzPlus
+              <span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">
+                SMM
+              </span>
             </span>
           </div>
 
@@ -224,7 +238,11 @@ export default function DashboardLayout({
           <div className="hidden lg:flex items-center gap-3">
             <Activity className="w-4 h-4 text-cyber-purple" />
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-              SMM Panel // {pathname.replace("/dashboard", "").replace("/", "").toUpperCase() || "OVERVIEW"}
+              SMM Panel //{" "}
+              {pathname
+                .replace("/dashboard", "")
+                .replace("/", "")
+                .toUpperCase() || "OVERVIEW"}
             </span>
           </div>
 
@@ -253,9 +271,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Child Components Workspace */}
-        <div className="flex-1 p-4 lg:p-8">
-          {children}
-        </div>
+        <div className="flex-1 p-4 lg:p-8">{children}</div>
       </main>
 
       {/* Mobile Bottom Navigation */}
@@ -268,13 +284,17 @@ export default function DashboardLayout({
               key={item.path}
               href={item.path}
               className={`flex flex-col items-center justify-center gap-1 w-full h-full text-center transition-all ${
-                isActive 
-                  ? "text-cyber-purple font-medium" 
+                isActive
+                  ? "text-cyber-purple font-medium"
                   : "text-slate-450 hover:text-white"
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? "text-cyber-purple" : "text-slate-400"}`} />
-              <span className="text-[10px] tracking-wide font-semibold">{item.name}</span>
+              <Icon
+                className={`w-5 h-5 ${isActive ? "text-cyber-purple" : "text-slate-400"}`}
+              />
+              <span className="text-[10px] tracking-wide font-semibold">
+                {item.name}
+              </span>
             </Link>
           );
         })}

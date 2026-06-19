@@ -2,24 +2,24 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  updateDoc 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { 
-  Activity, 
-  Search, 
-  RefreshCw, 
-  Compass, 
-  Clock, 
-  ShieldCheck, 
-  ExternalLink
+import {
+  Activity,
+  Search,
+  RefreshCw,
+  Compass,
+  Clock,
+  ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 
 interface OrderLog {
@@ -40,14 +40,20 @@ interface OrderLog {
 
 export default function DashboardPage() {
   const { apiKey, user } = useAuth();
-  
+
   // Database orders
   const [orders, setOrders] = useState<OrderLog[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
   // Status Checker panel
   const [checkId, setCheckId] = useState("");
-  const [checkResult, setCheckResult] = useState<{ status: string; charge: string; currency?: string; start_count: number; remains: number } | null>(null);
+  const [checkResult, setCheckResult] = useState<{
+    status: string;
+    charge: string;
+    currency?: string;
+    start_count: number;
+    remains: number;
+  } | null>(null);
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkLogs, setCheckLogs] = useState<string[]>([
     "Ready. Enter an SMM Order ID to check status.",
@@ -68,24 +74,28 @@ export default function DashboardPage() {
     const q = query(
       ordersRef,
       where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: OrderLog[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        fetched.push({
-          id: doc.id,
-          ...data,
-        } as OrderLog);
-      });
-      setOrders(fetched);
-      setLoadingOrders(false);
-    }, (error) => {
-      console.error("Error reading Firestore orders:", error);
-      setLoadingOrders(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetched: OrderLog[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          fetched.push({
+            id: doc.id,
+            ...data,
+          } as OrderLog);
+        });
+        setOrders(fetched);
+        setLoadingOrders(false);
+      },
+      (error) => {
+        console.error("Error reading Firestore orders:", error);
+        setLoadingOrders(false);
+      },
+    );
 
     return () => unsubscribe();
   }, [user]);
@@ -97,7 +107,9 @@ export default function DashboardPage() {
 
     setCheckLoading(true);
     setCheckResult(null);
-    addCheckLog(`[Request] Querying SMM status for Order #${checkId.trim()}...`);
+    addCheckLog(
+      `[Request] Querying SMM status for Order #${checkId.trim()}...`,
+    );
 
     try {
       const res = await fetch("/api/smm", {
@@ -106,16 +118,19 @@ export default function DashboardPage() {
         body: JSON.stringify({
           action: "status",
           key: apiKey || "",
-          order: Number(checkId.trim()) || checkId.trim() // handles single numeric order ID
-        })
+          order: Number(checkId.trim()) || checkId.trim(), // handles single numeric order ID
+        }),
       });
       const data = await res.json();
 
       if (data && !data.error) {
         setCheckResult(data);
-        addCheckLog(`[Success] Status: ${data.status} | Remaining: ${data.remains} | Cost: $${data.charge}`);
+        addCheckLog(
+          `[Success] Status: ${data.status} | Remaining: ${data.remains} | Cost: $${data.charge}`,
+        );
       } else {
-        const errMsg = data?.error || "Returned null payload or invalid ID format.";
+        const errMsg =
+          data?.error || "Returned null payload or invalid ID format.";
         addCheckLog(`[Error] Inquiry failed: ${errMsg}`);
       }
     } catch (err: unknown) {
@@ -137,8 +152,8 @@ export default function DashboardPage() {
         body: JSON.stringify({
           action: "status",
           key: apiKey,
-          order: order.smmOrderId
-        })
+          order: order.smmOrderId,
+        }),
       });
       const data = await res.json();
 
@@ -148,7 +163,7 @@ export default function DashboardPage() {
         await updateDoc(docRef, {
           status: data.status || "Pending",
           charge: data.charge || "0.00",
-          remains: Number(data.remains) || 0
+          remains: Number(data.remains) || 0,
         });
       } else {
         console.error("Failed to sync order:", data?.error);
@@ -163,7 +178,12 @@ export default function DashboardPage() {
   // Trigger SMM refill for a completed/partial order
   const triggerRefill = async (order: OrderLog) => {
     if (!apiKey) return;
-    if (!confirm(`Are you sure you want to request a refill for Order #${order.smmOrderId}?`)) return;
+    if (
+      !confirm(
+        `Are you sure you want to request a refill for Order #${order.smmOrderId}?`,
+      )
+    )
+      return;
 
     setSyncingId(order.id);
     try {
@@ -173,15 +193,17 @@ export default function DashboardPage() {
         body: JSON.stringify({
           action: "refill",
           key: apiKey,
-          order: order.smmOrderId
-        })
+          order: order.smmOrderId,
+        }),
       });
       const data = await res.json();
 
       if (data && data.refill) {
         alert(`Refill request placed successfully. Refill ID: ${data.refill}`);
       } else {
-        alert(`Refill request failed: ${data?.error || "Not supported for this service."}`);
+        alert(
+          `Refill request failed: ${data?.error || "Not supported for this service."}`,
+        );
       }
     } catch (err) {
       console.error("Refill error:", err);
@@ -193,8 +215,12 @@ export default function DashboardPage() {
 
   // Calculations for stats
   const totalOrders = orders.length;
-  const uniqueBatches = Array.from(new Set(orders.map(o => o.batchId))).length;
-  const totalSpent = orders.reduce((sum, o) => sum + (Number(o.charge) || 0), 0).toFixed(4);
+  const uniqueBatches = Array.from(
+    new Set(orders.map((o) => o.batchId)),
+  ).length;
+  const totalSpent = orders
+    .reduce((sum, o) => sum + (Number(o.charge) || 0), 0)
+    .toFixed(4);
 
   // Status color mapper
   const getStatusBadge = (status: string) => {
@@ -234,7 +260,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 font-sans">
-      
       {/* Stats Tickers Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {/* Stat card 1 */}
@@ -281,12 +306,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-12 gap-6 items-start">
-        
         {/* Left: Orders history Table (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-purple"></div>
-            
+
             <div className="flex items-center justify-between border-b border-cyber-border pb-4 mb-5">
               <h2 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <Clock className="w-5 h-5 text-cyber-purple" />
@@ -301,9 +325,12 @@ export default function DashboardPage() {
             ) : orders.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <Compass className="w-12 h-12 text-slate-550 mx-auto" />
-                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">No Orders Found</h3>
+                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+                  No Orders Found
+                </h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  You haven&apos;t placed any SMM orders yet. Head over to the Place Orders tab to launch your first SMM campaign.
+                  You haven&apos;t placed any SMM orders yet. Head over to the
+                  Place Orders tab to launch your first SMM campaign.
                 </p>
               </div>
             ) : (
@@ -326,10 +353,17 @@ export default function DashboardPage() {
                     </thead>
                     <tbody className="divide-y divide-cyber-border/40 text-slate-300">
                       {orders.map((order) => (
-                        <tr key={order.id} className="hover:bg-slate-800/20 transition-colors">
+                        <tr
+                          key={order.id}
+                          className="hover:bg-slate-800/20 transition-colors"
+                        >
                           {/* Date */}
                           <td className="py-4 px-3 text-slate-400 whitespace-nowrap">
-                            {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                            {order.createdAt
+                              ? new Date(
+                                  order.createdAt.seconds * 1000,
+                                ).toLocaleDateString()
+                              : "-"}
                           </td>
                           {/* Campaign/Batch ID */}
                           <td className="py-4 px-3 text-cyber-purple font-semibold">
@@ -340,12 +374,20 @@ export default function DashboardPage() {
                             #{order.smmOrderId}
                           </td>
                           {/* Service name */}
-                          <td className="py-4 px-3 font-medium max-w-[130px] truncate" title={order.serviceName}>
+                          <td
+                            className="py-4 px-3 font-medium max-w-[130px] truncate"
+                            title={order.serviceName}
+                          >
                             {order.serviceName}
                           </td>
                           {/* Target link */}
                           <td className="py-4 px-3 max-w-[110px] truncate text-cyber-blue hover:underline">
-                            <a href={order.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                            <a
+                              href={order.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1"
+                            >
                               Link <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           </td>
@@ -370,7 +412,9 @@ export default function DashboardPage() {
                                 className="p-1.5 hover:bg-cyber-blue/10 hover:text-cyber-blue border border-transparent hover:border-cyber-blue/20 rounded-lg transition-all cursor-pointer"
                                 title="Refresh Order Status"
                               >
-                                <RefreshCw className={`w-4 h-4 ${syncingId === order.id ? "animate-spin text-cyber-blue" : "text-slate-400"}`} />
+                                <RefreshCw
+                                  className={`w-4 h-4 ${syncingId === order.id ? "animate-spin text-cyber-blue" : "text-slate-400"}`}
+                                />
                               </button>
                               <button
                                 onClick={() => triggerRefill(order)}
@@ -391,20 +435,30 @@ export default function DashboardPage() {
                 {/* Mobile View Cards */}
                 <div className="block md:hidden space-y-4">
                   {orders.map((order) => (
-                    <div 
-                      key={order.id} 
+                    <div
+                      key={order.id}
                       className="bg-cyber-input/40 border border-cyber-border rounded-xl p-4 space-y-3 shadow-lg relative overflow-hidden"
                     >
                       {/* Top bar with ID, Date, and Campaign */}
                       <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-semibold uppercase tracking-wider pb-2 border-b border-cyber-border/40">
                         <div>
-                          ID: <span className="text-white">#{order.smmOrderId}</span>
+                          ID:{" "}
+                          <span className="text-white">
+                            #{order.smmOrderId}
+                          </span>
                         </div>
                         <div>
-                          Campaign: <span className="text-cyber-purple font-bold">{order.batchId}</span>
+                          Campaign:{" "}
+                          <span className="text-cyber-purple font-bold">
+                            {order.batchId}
+                          </span>
                         </div>
                         <div>
-                          {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                          {order.createdAt
+                            ? new Date(
+                                order.createdAt.seconds * 1000,
+                              ).toLocaleDateString()
+                            : "-"}
                         </div>
                       </div>
 
@@ -421,19 +475,29 @@ export default function DashboardPage() {
                       {/* Qty, Cost & Link */}
                       <div className="grid grid-cols-3 gap-2 py-1 text-[11px] text-slate-400 font-medium">
                         <div>
-                          <div className="text-[9px] text-slate-550 uppercase tracking-widest font-bold">Quantity</div>
-                          <div className="text-slate-200 font-mono mt-0.5">{order.quantity}</div>
+                          <div className="text-[9px] text-slate-550 uppercase tracking-widest font-bold">
+                            Quantity
+                          </div>
+                          <div className="text-slate-200 font-mono mt-0.5">
+                            {order.quantity}
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">Cost</div>
-                          <div className="text-cyber-green font-mono font-semibold mt-0.5">${Number(order.charge).toFixed(4)}</div>
+                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">
+                            Cost
+                          </div>
+                          <div className="text-cyber-green font-mono font-semibold mt-0.5">
+                            ${Number(order.charge).toFixed(4)}
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">Link</div>
-                          <a 
-                            href={order.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">
+                            Link
+                          </div>
+                          <a
+                            href={order.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-cyber-blue hover:underline inline-flex items-center gap-0.5 mt-0.5"
                           >
                             Target <ExternalLink className="w-3 h-3" />
@@ -443,9 +507,7 @@ export default function DashboardPage() {
 
                       {/* Status and Action Buttons */}
                       <div className="flex items-center justify-between pt-2 border-t border-cyber-border/40">
-                        <div>
-                          {getStatusBadge(order.status)}
-                        </div>
+                        <div>{getStatusBadge(order.status)}</div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => syncOrderStatus(order)}
@@ -453,7 +515,9 @@ export default function DashboardPage() {
                             className="bg-cyber-blue/10 hover:bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/20 rounded px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                             title="Refresh Status"
                           >
-                            <RefreshCw className={`w-3 h-3 ${syncingId === order.id ? "animate-spin" : ""}`} />
+                            <RefreshCw
+                              className={`w-3 h-3 ${syncingId === order.id ? "animate-spin" : ""}`}
+                            />
                             Sync
                           </button>
                           <button
@@ -477,7 +541,6 @@ export default function DashboardPage() {
 
         {/* Right: Live ID Status checker (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
-          
           {/* Status Check card */}
           <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
@@ -521,16 +584,22 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-slate-400">
                   <div>Live Status:</div>
-                  <div className="text-white font-bold">{checkResult.status}</div>
-                  
+                  <div className="text-white font-bold">
+                    {checkResult.status}
+                  </div>
+
                   <div>Charge Rate:</div>
-                  <div className="text-cyber-green font-bold">${checkResult.charge} {checkResult.currency}</div>
-                  
+                  <div className="text-cyber-green font-bold">
+                    ${checkResult.charge} {checkResult.currency}
+                  </div>
+
                   <div>Start Count:</div>
                   <div className="text-white">{checkResult.start_count}</div>
-                  
+
                   <div>Remaining Count:</div>
-                  <div className="text-cyber-blue font-bold">{checkResult.remains}</div>
+                  <div className="text-cyber-blue font-bold">
+                    {checkResult.remains}
+                  </div>
                 </div>
               </div>
             )}
@@ -541,7 +610,9 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2.5 border-b border-cyber-border pb-3 mb-3">
                 <Activity className="w-4.5 h-4.5 text-cyber-blue animate-pulse" />
-                <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">Inquiry Activity Log</span>
+                <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">
+                  Inquiry Activity Log
+                </span>
               </div>
               <div className="space-y-2 text-xs leading-relaxed overflow-y-auto max-h-[130px] pr-1 text-slate-400">
                 {checkLogs.map((log, idx) => (
@@ -555,9 +626,7 @@ export default function DashboardPage() {
               Gateway Route: /api/smm
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );
