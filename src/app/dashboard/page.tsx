@@ -271,7 +271,7 @@ export default function DashboardPage() {
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             Total Charges
           </span>
-          <span className="text-3xl font-extrabold text-cyber-green glow-green mt-1.5">
+          <span className="text-3xl font-extrabold text-cyber-purple glow-purple mt-1.5">
             $ {totalSpent}
           </span>
           <span className="text-xs text-slate-500 mt-2">
@@ -504,7 +504,7 @@ export default function DashboardPage() {
                   <button
                     type="submit"
                     disabled={checkLoading || !checkId.trim()}
-                    className="bg-cyber-blue hover:bg-cyber-blue/90 text-white font-bold text-sm px-5 rounded-lg cursor-pointer transition-all disabled:opacity-50"
+                    className="bg-cyber-purple hover:bg-cyber-blue text-black font-extrabold text-sm px-5 rounded-lg cursor-pointer transition-all disabled:opacity-50 hover:shadow-[0_0_15px_rgba(247,151,29,0.3)]"
                   >
                     {checkLoading ? "..." : "Check"}
                   </button>

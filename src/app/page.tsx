@@ -86,8 +86,8 @@ export default function AuthPage() {
   return (
     <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-cyber-bg cyber-grid relative select-none">
       {/* Soft gradient background glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyber-purple/10 rounded-full filter blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyber-blue/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyber-purple/5 rounded-full filter blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-slate-800/10 rounded-full filter blur-[120px] pointer-events-none"></div>
 
       <div className="w-full max-w-4xl grid md:grid-cols-5 gap-6 z-10">
         
@@ -116,11 +116,11 @@ export default function AuthPage() {
         {/* Main Auth Form Card */}
         <div className="md:col-span-3 bg-cyber-card/90 border border-cyber-border rounded-xl p-6 md:p-8 flex flex-col justify-center shadow-[0_8px_32px_rgba(0,0,0,0.5)] relative overflow-hidden">
           {/* Top gradient highlight line */}
-          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyber-purple via-cyber-blue to-cyber-green"></div>
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-purple"></div>
 
           <div className="text-center md:text-left mb-6">
-            <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center justify-center md:justify-start gap-2">
-              BuzzPlus<span className="text-cyber-purple glow-purple">SMM</span>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center justify-center md:justify-start gap-1">
+              BuzzPlus<span className="bg-cyber-purple text-black px-2 py-0.5 rounded font-black ml-1 text-2xl tracking-tighter uppercase shadow-sm">SMM</span>
             </h1>
             <p className="text-sm text-slate-400 mt-1.5">
               Secure SMM Campaign Management Platform
@@ -178,11 +178,11 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full mt-3 bg-gradient-to-r from-cyber-purple to-cyber-purple/95 hover:from-cyber-purple/95 hover:to-cyber-purple hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] text-white font-bold py-3 px-4 rounded-lg text-sm tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full mt-3 bg-cyber-purple hover:bg-cyber-blue text-black font-extrabold py-3 px-4 rounded-lg text-sm tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(247,151,29,0.35)]"
             >
               {authLoading ? (
                 <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   Connecting...
                 </>
               ) : (

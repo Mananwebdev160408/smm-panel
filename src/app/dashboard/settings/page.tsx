@@ -130,11 +130,11 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={status === "testing"}
-              className="bg-cyber-blue hover:bg-cyber-blue/90 text-white font-bold text-sm py-2.5 px-5 rounded-lg transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              className="bg-cyber-purple hover:bg-cyber-blue text-black font-extrabold text-sm py-2.5 px-5 rounded-lg transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2 hover:shadow-[0_0_15px_rgba(247,151,29,0.3)]"
             >
               {status === "testing" ? (
                 <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                   Validating Key...
                 </>
               ) : (

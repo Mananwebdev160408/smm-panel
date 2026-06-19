@@ -709,17 +709,17 @@ export default function MultiOrderPage() {
                 <button
                   onClick={handleExecuteCampaign}
                   disabled={executing}
-                  className="w-full bg-gradient-to-r from-cyber-purple to-cyber-purple/95 hover:from-cyber-purple/95 hover:to-cyber-purple hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] text-white font-bold text-sm py-4 px-4 rounded-lg tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-5"
+                  className="w-full bg-cyber-purple hover:bg-cyber-blue text-black font-extrabold text-sm py-4 px-4 rounded-lg tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-5 hover:shadow-[0_0_20px_rgba(247,151,29,0.35)]"
                 >
                   {executing ? (
                     <>
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                       Submitting campaign orders...
                     </>
                   ) : (
                     <>
                       Submit Campaign Orders — ₹{totalINRCost.toFixed(2)} ({campaignItems.length} services)
-                      <Play className="w-4 h-4 fill-white text-white" />
+                      <Play className="w-4 h-4 fill-black text-black" />
                     </>
                   )}
                 </button>

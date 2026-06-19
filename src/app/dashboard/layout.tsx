@@ -109,9 +109,9 @@ export default function DashboardLayout({
         <div>
           {/* Brand header */}
           <div className="h-16 flex items-center px-6 border-b border-cyber-border justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="text-lg font-black tracking-widest text-white">
-                BuzzPlus<span className="text-cyber-purple glow-purple font-medium">SMM</span>
+            <Link href="/dashboard" className="flex items-center gap-1">
+              <span className="text-lg font-extrabold tracking-tight text-white">
+                BuzzPlus<span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">SMM</span>
               </span>
             </Link>
             <div className="flex items-center gap-1.5 bg-cyber-green/10 border border-cyber-green/20 px-2 py-0.5 rounded text-[10px] text-cyber-green font-semibold uppercase">
@@ -199,15 +199,6 @@ export default function DashboardLayout({
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-cyber-border space-y-2">
-          {/* Live system state */}
-          <div className="flex items-center justify-between text-xs text-slate-500 px-3">
-            <span className="flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-cyber-blue" />
-              System Status
-            </span>
-            <span className="text-cyber-green font-semibold">Online</span>
-          </div>
-
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-cyber-red hover:bg-cyber-red/10 border border-transparent hover:border-cyber-red/20 transition-all cursor-pointer"
@@ -223,9 +214,9 @@ export default function DashboardLayout({
         {/* Top Header info */}
         <header className="h-16 border-b border-cyber-border px-4 lg:px-8 flex items-center justify-between shrink-0 bg-cyber-card/25 backdrop-blur-sm">
           {/* On mobile: show Brand logo */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <span className="text-base font-black tracking-widest text-white">
-              BuzzPlus<span className="text-cyber-purple glow-purple font-medium">SMM</span>
+          <div className="flex items-center gap-1 lg:hidden">
+            <span className="text-base font-extrabold tracking-tight text-white">
+              BuzzPlus<span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">SMM</span>
             </span>
           </div>
 

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BUZZ-SHADOW // SMM Terminal",
+  title: "BUZZ-ORANGE // SMM Terminal",
   description: "Advanced Multi-Order SMM Control Center",
 };
 
@@ -29,7 +29,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-cyber-bg text-slate-200 selection:bg-cyber-green selection:text-black">
+      <body className="min-h-full flex flex-col bg-cyber-bg text-slate-200 selection:bg-cyber-purple selection:text-black">
         <AuthProvider>
           {children}
         </AuthProvider>
