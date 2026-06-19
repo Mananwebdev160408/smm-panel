@@ -307,84 +307,170 @@ export default function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-cyber-border text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                      <th className="py-3 px-3">DATE</th>
-                      <th className="py-3 px-3">CAMPAIGN</th>
-                      <th className="py-3 px-3">SMM ID</th>
-                      <th className="py-3 px-3">SERVICE</th>
-                      <th className="py-3 px-3">LINK</th>
-                      <th className="py-3 px-3 text-right">QTY</th>
-                      <th className="py-3 px-3 text-right">COST</th>
-                      <th className="py-3 px-3 text-center">STATUS</th>
-                      <th className="py-3 px-3 text-center">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cyber-border/40 text-slate-300">
-                    {orders.map((order) => (
-                      <tr key={order.id} className="hover:bg-slate-800/20 transition-colors">
-                        {/* Date */}
-                        <td className="py-4 px-3 text-slate-400 whitespace-nowrap">
-                          {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
-                        </td>
-                        {/* Campaign/Batch ID */}
-                        <td className="py-4 px-3 text-cyber-purple font-semibold">
-                          {order.batchId}
-                        </td>
-                        {/* SMM ID */}
-                        <td className="py-4 px-3 text-slate-200 font-semibold">
-                          #{order.smmOrderId}
-                        </td>
-                        {/* Service name */}
-                        <td className="py-4 px-3 font-medium max-w-[130px] truncate" title={order.serviceName}>
-                          {order.serviceName}
-                        </td>
-                        {/* Target link */}
-                        <td className="py-4 px-3 max-w-[110px] truncate text-cyber-blue hover:underline">
-                          <a href={order.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-                            Link <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        </td>
-                        {/* Qty */}
-                        <td className="py-4 px-3 text-right text-slate-300 font-medium">
-                          {order.quantity}
-                        </td>
-                        {/* Cost */}
-                        <td className="py-4 px-3 text-right text-cyber-green font-semibold">
-                          ${Number(order.charge).toFixed(4)}
-                        </td>
-                        {/* Status badge */}
-                        <td className="py-4 px-3 text-center">
-                          {getStatusBadge(order.status)}
-                        </td>
-                        {/* Individual actions */}
-                        <td className="py-4 px-3 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => syncOrderStatus(order)}
-                              disabled={syncingId === order.id}
-                              className="p-1.5 hover:bg-cyber-blue/10 hover:text-cyber-blue border border-transparent hover:border-cyber-blue/20 rounded-lg transition-all cursor-pointer"
-                              title="Refresh Order Status"
-                            >
-                              <RefreshCw className={`w-4 h-4 ${syncingId === order.id ? "animate-spin text-cyber-blue" : "text-slate-400"}`} />
-                            </button>
-                            <button
-                              onClick={() => triggerRefill(order)}
-                              disabled={syncingId === order.id}
-                              className="p-1.5 hover:bg-cyber-green/10 hover:text-cyber-green border border-transparent hover:border-cyber-green/20 rounded-lg transition-all cursor-pointer"
-                              title="Request Refill"
-                            >
-                              <ShieldCheck className="w-4 h-4 text-slate-400 hover:text-cyber-green transition-colors" />
-                            </button>
-                          </div>
-                        </td>
+              <>
+                {/* Desktop View Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-cyber-border text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-3">DATE</th>
+                        <th className="py-3 px-3">CAMPAIGN</th>
+                        <th className="py-3 px-3">SMM ID</th>
+                        <th className="py-3 px-3">SERVICE</th>
+                        <th className="py-3 px-3">LINK</th>
+                        <th className="py-3 px-3 text-right">QTY</th>
+                        <th className="py-3 px-3 text-right">COST</th>
+                        <th className="py-3 px-3 text-center">STATUS</th>
+                        <th className="py-3 px-3 text-center">ACTIONS</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-cyber-border/40 text-slate-300">
+                      {orders.map((order) => (
+                        <tr key={order.id} className="hover:bg-slate-800/20 transition-colors">
+                          {/* Date */}
+                          <td className="py-4 px-3 text-slate-400 whitespace-nowrap">
+                            {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                          </td>
+                          {/* Campaign/Batch ID */}
+                          <td className="py-4 px-3 text-cyber-purple font-semibold">
+                            {order.batchId}
+                          </td>
+                          {/* SMM ID */}
+                          <td className="py-4 px-3 text-slate-200 font-semibold">
+                            #{order.smmOrderId}
+                          </td>
+                          {/* Service name */}
+                          <td className="py-4 px-3 font-medium max-w-[130px] truncate" title={order.serviceName}>
+                            {order.serviceName}
+                          </td>
+                          {/* Target link */}
+                          <td className="py-4 px-3 max-w-[110px] truncate text-cyber-blue hover:underline">
+                            <a href={order.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                              Link <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </td>
+                          {/* Qty */}
+                          <td className="py-4 px-3 text-right text-slate-300 font-medium">
+                            {order.quantity}
+                          </td>
+                          {/* Cost */}
+                          <td className="py-4 px-3 text-right text-cyber-green font-semibold">
+                            ${Number(order.charge).toFixed(4)}
+                          </td>
+                          {/* Status badge */}
+                          <td className="py-4 px-3 text-center">
+                            {getStatusBadge(order.status)}
+                          </td>
+                          {/* Individual actions */}
+                          <td className="py-4 px-3 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => syncOrderStatus(order)}
+                                disabled={syncingId === order.id}
+                                className="p-1.5 hover:bg-cyber-blue/10 hover:text-cyber-blue border border-transparent hover:border-cyber-blue/20 rounded-lg transition-all cursor-pointer"
+                                title="Refresh Order Status"
+                              >
+                                <RefreshCw className={`w-4 h-4 ${syncingId === order.id ? "animate-spin text-cyber-blue" : "text-slate-400"}`} />
+                              </button>
+                              <button
+                                onClick={() => triggerRefill(order)}
+                                disabled={syncingId === order.id}
+                                className="p-1.5 hover:bg-cyber-green/10 hover:text-cyber-green border border-transparent hover:border-cyber-green/20 rounded-lg transition-all cursor-pointer"
+                                title="Request Refill"
+                              >
+                                <ShieldCheck className="w-4 h-4 text-slate-400 hover:text-cyber-green transition-colors" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View Cards */}
+                <div className="block md:hidden space-y-4">
+                  {orders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="bg-cyber-input/40 border border-cyber-border rounded-xl p-4 space-y-3 shadow-lg relative overflow-hidden"
+                    >
+                      {/* Top bar with ID, Date, and Campaign */}
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-semibold uppercase tracking-wider pb-2 border-b border-cyber-border/40">
+                        <div>
+                          ID: <span className="text-white">#{order.smmOrderId}</span>
+                        </div>
+                        <div>
+                          Campaign: <span className="text-cyber-purple font-bold">{order.batchId}</span>
+                        </div>
+                        <div>
+                          {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                        </div>
+                      </div>
+
+                      {/* Service name */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-cyber-blue font-semibold uppercase tracking-wider">
+                          {order.serviceCategory}
+                        </div>
+                        <h4 className="text-xs font-bold text-white leading-snug">
+                          {order.serviceName}
+                        </h4>
+                      </div>
+
+                      {/* Qty, Cost & Link */}
+                      <div className="grid grid-cols-3 gap-2 py-1 text-[11px] text-slate-400 font-medium">
+                        <div>
+                          <div className="text-[9px] text-slate-550 uppercase tracking-widest font-bold">Quantity</div>
+                          <div className="text-slate-200 font-mono mt-0.5">{order.quantity}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">Cost</div>
+                          <div className="text-cyber-green font-mono font-semibold mt-0.5">${Number(order.charge).toFixed(4)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-555 uppercase tracking-widest font-bold">Link</div>
+                          <a 
+                            href={order.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-cyber-blue hover:underline inline-flex items-center gap-0.5 mt-0.5"
+                          >
+                            Target <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Status and Action Buttons */}
+                      <div className="flex items-center justify-between pt-2 border-t border-cyber-border/40">
+                        <div>
+                          {getStatusBadge(order.status)}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => syncOrderStatus(order)}
+                            disabled={syncingId === order.id}
+                            className="bg-cyber-blue/10 hover:bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/20 rounded px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Refresh Status"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${syncingId === order.id ? "animate-spin" : ""}`} />
+                            Sync
+                          </button>
+                          <button
+                            onClick={() => triggerRefill(order)}
+                            disabled={syncingId === order.id}
+                            className="bg-cyber-green/10 hover:bg-cyber-green/20 text-cyber-green border border-cyber-green/20 rounded px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Request Refill"
+                          >
+                            <ShieldCheck className="w-3 h-3" />
+                            Refill
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -74,6 +74,49 @@ export default function MultiOrderPage() {
     setConsoleLogs((prev) => [...prev, log]);
   };
 
+  // Helper to compute order quantity for a campaign item
+  const getItemQty = (item: CampaignItem): number => {
+    const typeLower = item.service.type.toLowerCase();
+    // IMPORTANT: check "comment likes" BEFORE "comments" to avoid substring collision
+    if (typeLower.includes("comment likes")) {
+      return Number(item.quantity) || 100;
+    } else if (typeLower.includes("comments")) {
+      // Comments type: each non-empty line is one comment sent
+      const commentsList = item.comments
+        ? item.comments.split("\n").filter((c) => c.trim().length > 0)
+        : [];
+      return commentsList.length || 1;
+    } else if (typeLower.includes("mentions")) {
+      return Number(item.quantity) || 100;
+    } else if (typeLower.includes("poll")) {
+      return Number(item.quantity) || 100;
+    } else if (typeLower.includes("package")) {
+      return 1;
+    } else {
+      // Default / Drip-feed:
+      // For drip-feed the API receives quantity-per-run; billing is also per-run quantity.
+      // Do NOT multiply by runs here — that would inflate the displayed cost.
+      return Number(item.quantity) || 100;
+    }
+  };
+
+  // Rate from API is already in INR — no conversion needed
+  const getItemCostINR = (item: CampaignItem): number => {
+    const qty = getItemQty(item);
+    const rateINR = Number(item.service.rate) || 0;
+    const typeLower = item.service.type.toLowerCase();
+    // Package services are flat-rate (not per-1k)
+    if (typeLower.includes("package")) {
+      return rateINR;
+    }
+    return (qty / 1000) * rateINR;
+  };
+
+  const totalINRCost = campaignItems.reduce(
+    (sum, item) => sum + getItemCostINR(item),
+    0
+  );
+
   // Fetch services list
   useEffect(() => {
     const fetchServices = async () => {
@@ -110,8 +153,17 @@ export default function MultiOrderPage() {
         }
 
         if (useCache) {
-          setServices(cachedData);
-          const cats = Array.from(new Set(cachedData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
+          // Filter for Instagram services only (case-insensitive with Unicode normalization and word boundary boundaries)
+          const igData = cachedData.filter((s: SMMService) => {
+            if (!s.category) return false;
+            let normalized = s.category.normalize("NFKD").toLowerCase();
+            normalized = normalized.replace(/i̇/g, "i").replace(/ı/g, "i");
+            if (normalized.includes("instagram")) return true;
+            const igRegex = /\big\b/i;
+            return igRegex.test(normalized);
+          });
+          setServices(igData);
+          const cats = Array.from(new Set(igData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
           setCategories(cats.sort());
           if (cats.length > 0) {
             setSelectedCategory(cats[0]);
@@ -129,9 +181,18 @@ export default function MultiOrderPage() {
         const data = await res.json();
         
         if (Array.isArray(data)) {
-          setServices(data);
+          // Filter for Instagram services only (case-insensitive with Unicode normalization and word boundary boundaries)
+          const igData = data.filter((s: SMMService) => {
+            if (!s.category) return false;
+            let normalized = s.category.normalize("NFKD").toLowerCase();
+            normalized = normalized.replace(/i̇/g, "i").replace(/ı/g, "i");
+            if (normalized.includes("instagram")) return true;
+            const igRegex = /\big\b/i;
+            return igRegex.test(normalized);
+          });
+          setServices(igData);
           // Extract unique categories
-          const cats = Array.from(new Set(data.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
+          const cats = Array.from(new Set(igData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
           setCategories(cats.sort());
           if (cats.length > 0) {
             setSelectedCategory(cats[0]);
@@ -303,6 +364,8 @@ export default function MultiOrderPage() {
           successCount++;
 
           if (user) {
+            const orderQty = getItemQty(item);
+            const orderCostINR = getItemCostINR(item);
             await addDoc(collection(db, "orders"), {
               userId: user.uid,
               serviceId: s.service,
@@ -310,12 +373,13 @@ export default function MultiOrderPage() {
               serviceCategory: s.category,
               serviceType: s.type,
               link: targetLink.trim(),
-              quantity: payload.quantity || 1,
+              quantity: orderQty,
               smmOrderId: data.order,
               batchId,
               status: "Pending",
-              charge: "0.00",
-              remains: payload.quantity || 0,
+              charge: orderCostINR.toFixed(2),
+              currency: "INR",
+              remains: orderQty,
               createdAt: serverTimestamp(),
             });
           }
@@ -422,7 +486,13 @@ export default function MultiOrderPage() {
                         </h3>
                         <div className="text-xs text-slate-455">
                           Type: <span className="text-cyber-blue font-semibold">{s.type}</span> | 
-                          Rate: <span className="text-cyber-green font-semibold">${s.rate}/1k</span>
+                          Rate: <span className="text-cyber-green font-semibold">₹{s.rate}/1k</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono">
+                          Est. cost:{" "}
+                          <span className="text-cyber-yellow font-semibold">
+                            ₹{getItemCostINR(item).toFixed(2)}
+                          </span>
                         </div>
                       </div>
 
@@ -648,7 +718,7 @@ export default function MultiOrderPage() {
                     </>
                   ) : (
                     <>
-                      Submit Campaign Orders ({campaignItems.length} services)
+                      Submit Campaign Orders — ₹{totalINRCost.toFixed(2)} ({campaignItems.length} services)
                       <Play className="w-4 h-4 fill-white text-white" />
                     </>
                   )}
@@ -721,7 +791,7 @@ export default function MultiOrderPage() {
                       </div>
                       <h4 className="text-xs text-white font-bold leading-normal">{s.name}</h4>
                       <p className="text-[11px] text-slate-500 font-mono">
-                        Rate: <span className="text-cyber-green font-semibold">${s.rate}/1k</span> | Min: {s.min} | Max: {s.max}
+                        Rate: <span className="text-cyber-green font-semibold">₹{s.rate}/1k</span> | Min: {s.min} | Max: {s.max}
                       </p>
                     </div>
                     <button
