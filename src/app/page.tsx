@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { Activity, Mail, Lock, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Activity, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 export default function AuthPage() {
   const { user, loading, signInUser, signUpUser } = useAuth();
@@ -73,9 +73,10 @@ export default function AuthPage() {
         await signUpUser(email, password);
         setSystemLogs((prev) => [...prev, "Account successfully registered. Welcome!"]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "Authentication failed. Please verify your credentials.");
+      const errorMessage = err instanceof Error ? err.message : "Authentication failed. Please verify your credentials.";
+      setError(errorMessage);
       setSystemLogs((prev) => [...prev, `[Error] Authentication rejected.`]);
     } finally {
       setAuthLoading(false);

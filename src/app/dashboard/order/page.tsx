@@ -5,7 +5,10 @@ import { useAuth } from "@/context/AuthContext";
 import { 
   collection, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  getDoc,
+  setDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
@@ -14,11 +17,9 @@ import {
   Trash2, 
   Play, 
   Search, 
-  Terminal, 
   AlertCircle,
   HelpCircle,
-  Clock,
-  Sparkles
+  Activity
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +49,8 @@ interface CampaignItem {
   interval?: number;
 }
 
+let idCounter = 0;
+
 export default function MultiOrderPage() {
   const { apiKey, user } = useAuth();
   
@@ -64,7 +67,7 @@ export default function MultiOrderPage() {
   const [campaignItems, setCampaignItems] = useState<CampaignItem[]>([]);
   const [executing, setExecuting] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
-    "CAMPAIGN ENGINE IDLE. STANDBY FOR LINK INPUT...",
+    "Campaign creator ready. Please enter a target link.",
   ]);
 
   const addLog = (log: string) => {
@@ -78,6 +81,46 @@ export default function MultiOrderPage() {
       setLoadingServices(true);
       setFetchError("");
       try {
+        // Check Firestore Cache First
+        const cacheDocRef = doc(db, "services_cache", "global_catalog");
+        let useCache = false;
+        let cachedData: SMMService[] = [];
+        
+        try {
+          const cacheDocSnap = await getDoc(cacheDocRef);
+          if (cacheDocSnap.exists()) {
+            const cacheDocData = cacheDocSnap.data();
+            const updatedAt = cacheDocData.updatedAt;
+            if (updatedAt && Array.isArray(cacheDocData.services) && cacheDocData.services.length > 0) {
+              const updatedAtMs = typeof updatedAt.toMillis === "function"
+                ? updatedAt.toMillis()
+                : (updatedAt.seconds ? updatedAt.seconds * 1000 : Number(updatedAt));
+              
+              const ageMs = Date.now() - updatedAtMs;
+              const twelveHoursMs = 12 * 60 * 60 * 1000;
+              
+              if (ageMs < twelveHoursMs) {
+                useCache = true;
+                cachedData = cacheDocData.services;
+              }
+            }
+          }
+        } catch (cacheErr) {
+          console.warn("Failed to fetch services list from cache, falling back to API:", cacheErr);
+        }
+
+        if (useCache) {
+          setServices(cachedData);
+          const cats = Array.from(new Set(cachedData.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
+          setCategories(cats.sort());
+          if (cats.length > 0) {
+            setSelectedCategory(cats[0]);
+          }
+          setLoadingServices(false);
+          return;
+        }
+
+        // Fallback to SMM API
         const res = await fetch("/api/smm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -88,10 +131,20 @@ export default function MultiOrderPage() {
         if (Array.isArray(data)) {
           setServices(data);
           // Extract unique categories
-          const cats = Array.from(new Set(data.map((s: any) => s.category || "Uncategorized"))) as string[];
+          const cats = Array.from(new Set(data.map((s: SMMService) => s.category || "Uncategorized"))) as string[];
           setCategories(cats.sort());
           if (cats.length > 0) {
             setSelectedCategory(cats[0]);
+          }
+
+          // Save to Firestore Cache asynchronously without blocking UI update
+          try {
+            await setDoc(cacheDocRef, {
+              services: data,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          } catch (writeErr) {
+            console.error("Failed to write services list to Firestore cache:", writeErr);
           }
         } else {
           setFetchError(data?.error || "Failed to load services list from SMM API.");
@@ -109,28 +162,28 @@ export default function MultiOrderPage() {
 
   if (!apiKey) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl font-sans">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-wider flex items-center gap-2">
-            MULTI-ORDER CAMPAIGN DECK
+          <h1 className="text-2xl font-extrabold text-white tracking-wide flex items-center gap-2">
+            Campaign Creator
           </h1>
-          <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest">
-            Execute parallel actions on multiple services simultaneously
+          <p className="text-sm text-slate-450 mt-1">
+            Configure and execute SMM orders for multiple services simultaneously
           </p>
         </div>
-        <div className="bg-cyber-card border border-cyber-red/20 rounded-lg p-8 text-center space-y-4">
+        <div className="bg-cyber-card border border-cyber-red/20 rounded-xl p-8 text-center space-y-4 shadow-lg">
           <AlertCircle className="w-12 h-12 text-cyber-red mx-auto animate-pulse" />
-          <h2 className="text-base font-bold text-white uppercase tracking-wider">
-            [ACCESS REJECTED: API GATEWAY OFFLINE]
+          <h2 className="text-lg font-bold text-white uppercase tracking-wider">
+            API Key Required
           </h2>
-          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            You must configure a valid BuzzPlusSMM API key in your node settings before you can compile and deploy multi-order campaigns.
+          <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            You must configure a valid SMM API key in your settings before you can create and launch campaigns.
           </p>
           <Link
             href="/dashboard/settings"
-            className="inline-block bg-cyber-red hover:bg-cyber-red hover:shadow-[0_0_15px_rgba(255,51,102,0.25)] text-black font-extrabold text-xs py-2 px-6 rounded tracking-wider transition-all"
+            className="inline-block bg-cyber-red hover:bg-cyber-red/90 text-white font-bold text-xs py-3 px-6 rounded-lg tracking-wider transition-all"
           >
-            CONFIGURE API NODE
+            Configure API Key
           </Link>
         </div>
       </div>
@@ -149,7 +202,7 @@ export default function MultiOrderPage() {
 
   const addToCampaign = (service: SMMService) => {
     const newItem: CampaignItem = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: `${service.service}-${++idCounter}`,
       service,
       quantity: Number(service.min) || 100,
       comments: "",
@@ -161,18 +214,18 @@ export default function MultiOrderPage() {
       interval: 60
     };
     setCampaignItems((prev) => [...prev, newItem]);
-    addLog(`[ADDED TO DECK] ID ${service.service}: ${service.name} (Type: ${service.type})`);
+    addLog(`Added: ${service.name} (#${service.service})`);
   };
 
   const removeFromCampaign = (id: string) => {
     const item = campaignItems.find(i => i.id === id);
     if (item) {
-      addLog(`[REMOVED FROM DECK] ID ${item.service.service}: ${item.service.name}`);
+      addLog(`Removed: ${item.service.name}`);
     }
     setCampaignItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const updateItemField = (id: string, field: keyof CampaignItem, value: any) => {
+  const updateItemField = (id: string, field: keyof CampaignItem, value: string | number | boolean) => {
     setCampaignItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
@@ -181,12 +234,12 @@ export default function MultiOrderPage() {
   // Place SMM Campaign orders
   const handleExecuteCampaign = async () => {
     if (!targetLink.trim()) {
-      addLog("[ALERT] CAMPAIGN EXECUTION HALTED: TARGET LINK CANNOT BE EMPTY.");
+      addLog("Error: Target link cannot be empty.");
       alert("Please provide a target link URL.");
       return;
     }
     if (campaignItems.length === 0) {
-      addLog("[ALERT] CAMPAIGN EXECUTION HALTED: DECK HAS ZERO SELECTED SERVICES.");
+      addLog("Error: Basket is empty.");
       alert("Please add at least one service to your campaign.");
       return;
     }
@@ -194,8 +247,8 @@ export default function MultiOrderPage() {
     setExecuting(true);
     const batchId = Math.random().toString(36).substring(2, 11).toUpperCase();
     
-    addLog(`[START BATCH ${batchId}] COMPILING DECK CONFIGS...`);
-    addLog(`[TARGET URL] ${targetLink}`);
+    addLog(`Starting batch ${batchId}...`);
+    addLog(`Target: ${targetLink}`);
 
     let successCount = 0;
     let failedCount = 0;
@@ -205,10 +258,10 @@ export default function MultiOrderPage() {
       const s = item.service;
       const stepNum = idx + 1;
       
-      addLog(`[STEP ${stepNum}/${campaignItems.length}] DEPLOYING ORDER: Service ${s.service} (${s.name})...`);
+      addLog(`[${stepNum}/${campaignItems.length}] Processing ${s.name}...`);
 
       // Prepare SMM payload based on service type
-      const payload: any = {
+      const payload: Record<string, string | number | boolean> = {
         action: "add",
         key: apiKey,
         service: s.service,
@@ -218,24 +271,18 @@ export default function MultiOrderPage() {
       const typeLower = s.type.toLowerCase();
 
       if (typeLower.includes("comments")) {
-        // Custom comments
         payload.comments = item.comments || "";
       } else if (typeLower.includes("mentions")) {
-        // Mentions
         payload.quantity = Number(item.quantity) || 100;
         payload.usernames = item.usernames || "";
       } else if (typeLower.includes("comment likes")) {
-        // Comment Likes
         payload.quantity = Number(item.quantity) || 100;
         payload.username = item.username || "";
       } else if (typeLower.includes("poll")) {
-        // Poll
         payload.quantity = Number(item.quantity) || 100;
         payload.answer_number = item.answer_number || "1";
       } else if (typeLower.includes("package")) {
-        // Package has no quantity or extra inputs
       } else {
-        // Default
         payload.quantity = Number(item.quantity) || 100;
         if (item.dripEnabled) {
           payload.runs = Number(item.runs) || 10;
@@ -252,10 +299,9 @@ export default function MultiOrderPage() {
         const data = await response.json();
 
         if (data && data.order) {
-          addLog(`[STEP ${stepNum} SUCCESS] BuzzPlusSMM ORDER CREATED: ID ${data.order}`);
+          addLog(`Success: Created order #${data.order}`);
           successCount++;
 
-          // Write to user history DB (Firestore)
           if (user) {
             await addDoc(collection(db, "orders"), {
               userId: user.uid,
@@ -267,25 +313,24 @@ export default function MultiOrderPage() {
               quantity: payload.quantity || 1,
               smmOrderId: data.order,
               batchId,
-              status: "Pending", // initial status
-              charge: "0.00", // fetched via status sync
+              status: "Pending",
+              charge: "0.00",
               remains: payload.quantity || 0,
               createdAt: serverTimestamp(),
             });
           }
         } else {
-          const errText = data?.error || "Unknown SMM error code.";
-          addLog(`[STEP ${stepNum} FAILED] REJECTED BY SMM: ${errText}`);
+          const errText = data?.error || "Unknown error.";
+          addLog(`Failed: ${errText}`);
           failedCount++;
         }
-      } catch (err: any) {
-        console.error("Step execution error:", err);
-        addLog(`[STEP ${stepNum} FATAL] BRIDGE CONNECTION ERROR.`);
+      } catch {
+        addLog(`Error: Connection failed.`);
         failedCount++;
       }
     }
 
-    addLog(`[BATCH ${batchId} SUMMARY] COMPLETE. Success: ${successCount}, Failures: ${failedCount}.`);
+    addLog(`Summary: Finished. Success: ${successCount}, Failed: ${failedCount}`);
     setExecuting(false);
     
     if (successCount > 0) {
@@ -297,14 +342,14 @@ export default function MultiOrderPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Title */}
       <div>
-        <h1 className="text-2xl font-black text-white tracking-wider flex items-center gap-2">
-          MULTI-ORDER CAMPAIGN DECK
+        <h1 className="text-2xl font-extrabold text-white tracking-wide flex items-center gap-2">
+          Place Campaign Orders
         </h1>
-        <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest">
-          Build actions basket and execute parallel orders in one single click
+        <p className="text-sm text-slate-450 mt-1">
+          Configure SMM orders for multiple services and execute them simultaneously.
         </p>
       </div>
 
@@ -314,15 +359,15 @@ export default function MultiOrderPage() {
         <div className="lg:col-span-8 space-y-6">
           
           {/* Target link Input */}
-          <div className="bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg relative">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyber-green"></div>
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
-              TARGET URL LINK
+          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-green"></div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+              Target Link URL
             </label>
             <input
               type="url"
               placeholder="https://www.instagram.com/p/C..."
-              className="w-full bg-cyber-input border border-cyber-border rounded px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-green transition-all"
+              className="w-full bg-cyber-input/60 border border-cyber-border rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-cyber-green transition-all"
               value={targetLink}
               onChange={(e) => setTargetLink(e.target.value)}
               disabled={executing}
@@ -330,17 +375,17 @@ export default function MultiOrderPage() {
           </div>
 
           {/* Campaign Items Deck */}
-          <div className="bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg relative min-h-[200px]">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyber-purple"></div>
-            <div className="flex justify-between items-center border-b border-cyber-border pb-3 mb-4">
+          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative min-h-[200px]">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-purple"></div>
+            <div className="flex justify-between items-center border-b border-cyber-border pb-3.5 mb-4">
               <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-cyber-purple" />
-                Selected Services Basket ({campaignItems.length})
+                <Layers className="w-5 h-5 text-cyber-purple" />
+                Order Basket ({campaignItems.length})
               </h2>
               {campaignItems.length > 0 && (
                 <button
                   onClick={() => setCampaignItems([])}
-                  className="text-[10px] text-cyber-red hover:underline uppercase font-bold"
+                  className="text-xs text-cyber-red hover:text-cyber-red/80 hover:underline uppercase font-bold transition-all"
                   disabled={executing}
                 >
                   Clear All
@@ -349,35 +394,35 @@ export default function MultiOrderPage() {
             </div>
 
             {campaignItems.length === 0 ? (
-              <div className="text-center py-12 space-y-2">
-                <HelpCircle className="w-10 h-10 text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-500 uppercase tracking-widest">Deck Basket is Empty</p>
-                <p className="text-[10px] text-slate-600 max-w-xs mx-auto">
-                  Select a category below, find services, and click "+" to add actions to this deck.
+              <div className="text-center py-12 space-y-3">
+                <HelpCircle className="w-10 h-10 text-slate-550 mx-auto animate-pulse" />
+                <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Your basket is empty</p>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                  Select a category in the catalog below, find services, and click &quot;+&quot; to add them to your campaign basket.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {campaignItems.map((item, idx) => {
+                {campaignItems.map((item) => {
                   const s = item.service;
                   const typeLower = s.type.toLowerCase();
                   
                   return (
                     <div 
                       key={item.id} 
-                      className="bg-cyber-input border border-cyber-border rounded p-4 relative flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="bg-cyber-input/40 border border-cyber-border rounded-lg p-4.5 relative flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all"
                     >
                       {/* Left info */}
-                      <div className="space-y-1 max-w-sm">
-                        <div className="text-[10px] text-cyber-purple font-bold">
-                          [ID: {s.service}] - {s.category}
+                      <div className="space-y-1.5 max-w-sm">
+                        <div className="text-[10px] text-cyber-purple font-semibold uppercase tracking-wider">
+                          Service #{s.service} — {s.category}
                         </div>
-                        <h3 className="text-xs font-extrabold text-white leading-snug">
+                        <h3 className="text-sm font-bold text-white leading-snug">
                           {s.name}
                         </h3>
-                        <div className="text-[9px] text-slate-500 uppercase">
-                          Type: <span className="text-cyber-blue font-bold">{s.type}</span> | 
-                          Rate: <span className="text-cyber-green font-bold">${s.rate}/1k</span>
+                        <div className="text-xs text-slate-455">
+                          Type: <span className="text-cyber-blue font-semibold">{s.type}</span> | 
+                          Rate: <span className="text-cyber-green font-semibold">${s.rate}/1k</span>
                         </div>
                       </div>
 
@@ -386,14 +431,14 @@ export default function MultiOrderPage() {
                         
                         {/* Custom Comments Form */}
                         {typeLower.includes("comments") && (
-                          <div className="space-y-1">
-                            <label className="text-[9px] text-slate-400 font-bold block uppercase">
-                              Comments (one per line)
+                          <div className="space-y-1.5">
+                            <label className="text-xs text-slate-400 font-semibold block">
+                              Comments (one comment per line)
                             </label>
                             <textarea
                               rows={3}
-                              placeholder="Nice pic!&#10;Wow!&#10;Incredible!"
-                              className="w-full bg-cyber-card border border-cyber-border rounded p-2 text-[10px] text-slate-200 font-mono focus:outline-none focus:border-cyber-purple"
+                              placeholder="Great!&#10;Nice photo!&#10;Incredible!"
+                              className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyber-purple transition-all"
                               value={item.comments || ""}
                               onChange={(e) => updateItemField(item.id, "comments", e.target.value)}
                               disabled={executing}
@@ -403,30 +448,30 @@ export default function MultiOrderPage() {
 
                         {/* Mentions Form */}
                         {typeLower.includes("mentions") && (
-                          <div className="space-y-2">
+                          <div className="space-y-3.5">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[9px] text-slate-400 font-bold block uppercase">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
-                                  className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.quantity || 100}
                                   onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
                                   disabled={executing}
                                 />
                               </div>
                               <div className="flex items-end">
-                                <span className="text-[8px] text-slate-500">Min: {s.min} | Max: {s.max}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold font-mono">Min: {s.min} | Max: {s.max}</span>
                               </div>
                             </div>
                             <div>
-                              <label className="text-[9px] text-slate-400 font-bold block uppercase">Usernames (one per line)</label>
+                              <label className="text-xs text-slate-400 font-semibold block">Usernames (one username per line)</label>
                               <textarea
                                 rows={2}
-                                placeholder="username1&#10;username2"
-                                className="w-full bg-cyber-card border border-cyber-border rounded p-2 text-[10px] text-slate-200 font-mono focus:outline-none focus:border-cyber-purple"
+                                placeholder="user1&#10;user2"
+                                className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyber-purple transition-all"
                                 value={item.usernames || ""}
                                 onChange={(e) => updateItemField(item.id, "usernames", e.target.value)}
                                 disabled={executing}
@@ -437,30 +482,30 @@ export default function MultiOrderPage() {
 
                         {/* Comment Likes Form */}
                         {typeLower.includes("comment likes") && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[9px] text-slate-400 font-bold block uppercase">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
-                                  className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.quantity || 100}
                                   onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
                                   disabled={executing}
                                 />
                               </div>
                               <div className="flex items-end">
-                                <span className="text-[8px] text-slate-500">Min: {s.min}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold font-mono">Min: {s.min}</span>
                               </div>
                             </div>
                             <div>
-                              <label className="text-[9px] text-slate-400 font-bold block uppercase">Comment Owner Username</label>
+                              <label className="text-xs text-slate-400 font-semibold block">Comment Username</label>
                               <input
                                 type="text"
-                                placeholder="john_doe"
-                                className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                placeholder="username"
+                                className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                 value={item.username || ""}
                                 onChange={(e) => updateItemField(item.id, "username", e.target.value)}
                                 disabled={executing}
@@ -471,26 +516,26 @@ export default function MultiOrderPage() {
 
                         {/* Poll Form */}
                         {typeLower.includes("poll") && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[9px] text-slate-400 font-bold block uppercase">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
-                                  className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.quantity || 100}
                                   onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
                                   disabled={executing}
                                 />
                               </div>
                               <div>
-                                <label className="text-[9px] text-slate-400 font-bold block uppercase">Answer (Option #)</label>
+                                <label className="text-xs text-slate-400 font-semibold block">Answer (Option #)</label>
                                 <input
                                   type="text"
                                   placeholder="e.g. 1"
-                                  className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.answer_number || "1"}
                                   onChange={(e) => updateItemField(item.id, "answer_number", e.target.value)}
                                   disabled={executing}
@@ -502,8 +547,8 @@ export default function MultiOrderPage() {
 
                         {/* Package Type (No inputs) */}
                         {typeLower.includes("package") && (
-                          <div className="text-[10px] text-slate-500 italic">
-                            No parameters needed. (Pre-packaged service quantity).
+                          <div className="text-xs text-slate-500 italic">
+                            No additional parameters needed for this service package.
                           </div>
                         )}
 
@@ -513,31 +558,31 @@ export default function MultiOrderPage() {
                          !typeLower.includes("comment likes") && 
                          !typeLower.includes("poll") && 
                          !typeLower.includes("package") && (
-                          <div className="space-y-2">
+                          <div className="space-y-3.5 font-sans">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[9px] text-slate-400 font-bold block uppercase">Quantity</label>
+                                <label className="text-xs text-slate-400 font-semibold block">Quantity</label>
                                 <input
                                   type="number"
                                   min={s.min}
                                   max={s.max}
-                                  className="w-full bg-cyber-card border border-cyber-border rounded p-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyber-purple"
+                                  className="w-full bg-cyber-card border border-cyber-border rounded-lg p-2 text-sm text-white focus:outline-none focus:border-cyber-purple transition-all"
                                   value={item.quantity || 100}
                                   onChange={(e) => updateItemField(item.id, "quantity", Number(e.target.value))}
                                   disabled={executing}
                                 />
                               </div>
-                              <div className="flex items-end text-[8px] text-slate-500 leading-normal">
-                                Min: {s.min}<br/>Max: {s.max}
+                              <div className="flex items-end text-[10px] text-slate-550 leading-normal font-semibold font-mono">
+                                Min: {s.min} <br/> Max: {s.max}
                               </div>
                             </div>
                             
                             {/* Drip-Feed Option */}
-                            <div className="space-y-1">
-                              <label className="flex items-center gap-1.5 text-[9px] text-slate-400 font-bold uppercase cursor-pointer">
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2 text-xs text-slate-400 font-semibold cursor-pointer">
                                 <input
                                   type="checkbox"
-                                  className="accent-cyber-purple"
+                                  className="accent-cyber-purple w-4 h-4 rounded"
                                   checked={item.dripEnabled || false}
                                   onChange={(e) => updateItemField(item.id, "dripEnabled", e.target.checked)}
                                   disabled={executing}
@@ -546,22 +591,22 @@ export default function MultiOrderPage() {
                               </label>
                               
                               {item.dripEnabled && (
-                                <div className="grid grid-cols-2 gap-2 p-1.5 bg-cyber-card rounded border border-cyber-border">
+                                <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-cyber-card rounded-lg border border-cyber-border transition-all">
                                   <div>
-                                    <label className="text-[8px] text-slate-500 block uppercase">Runs</label>
+                                    <label className="text-[10px] text-slate-500 uppercase block font-bold">Runs</label>
                                     <input
                                       type="number"
-                                      className="w-full bg-cyber-input border border-cyber-border rounded p-1 text-[10px] text-white font-mono focus:outline-none"
+                                      className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
                                       value={item.runs || 10}
                                       onChange={(e) => updateItemField(item.id, "runs", Number(e.target.value))}
                                       disabled={executing}
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-[8px] text-slate-500 block uppercase">Interval (min)</label>
+                                    <label className="text-[10px] text-slate-500 uppercase block font-bold">Interval (min)</label>
                                     <input
                                       type="number"
-                                      className="w-full bg-cyber-input border border-cyber-border rounded p-1 text-[10px] text-white font-mono focus:outline-none"
+                                      className="w-full bg-cyber-input border border-cyber-border rounded-lg p-1.5 text-xs text-white focus:outline-none"
                                       value={item.interval || 60}
                                       onChange={(e) => updateItemField(item.id, "interval", Number(e.target.value))}
                                       disabled={executing}
@@ -579,11 +624,11 @@ export default function MultiOrderPage() {
                       <div>
                         <button
                           onClick={() => removeFromCampaign(item.id)}
-                          className="p-2 text-slate-500 hover:text-cyber-red border border-transparent hover:border-cyber-red/20 hover:bg-cyber-red/5 rounded transition-all cursor-pointer"
+                          className="p-2 text-slate-400 hover:text-cyber-red border border-transparent hover:border-cyber-red/20 hover:bg-cyber-red/5 rounded-lg transition-all cursor-pointer"
                           disabled={executing}
                           title="Remove service"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -594,17 +639,17 @@ export default function MultiOrderPage() {
                 <button
                   onClick={handleExecuteCampaign}
                   disabled={executing}
-                  className="w-full bg-gradient-to-r from-cyber-green to-cyber-green-dim hover:from-cyber-green hover:to-cyber-green hover:shadow-[0_0_20px_rgba(0,255,102,0.3)] text-black font-extrabold text-xs py-3.5 px-4 rounded tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-4"
+                  className="w-full bg-gradient-to-r from-cyber-purple to-cyber-purple/95 hover:from-cyber-purple/95 hover:to-cyber-purple hover:shadow-[0_0_20px_rgba(99,102,241,0.25)] text-white font-bold text-sm py-4 px-4 rounded-lg tracking-wide flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-5"
                 >
                   {executing ? (
                     <>
-                      <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                      EXECUTING PARALLEL CAMPAIGN...
+                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Submitting campaign orders...
                     </>
                   ) : (
                     <>
-                      DEPLOY CAMPAIGN PACKET ({campaignItems.length} ACTIONS)
-                      <Play className="w-3.5 h-3.5 fill-black" />
+                      Submit Campaign Orders ({campaignItems.length} services)
+                      <Play className="w-4 h-4 fill-white text-white" />
                     </>
                   )}
                 </button>
@@ -613,33 +658,33 @@ export default function MultiOrderPage() {
           </div>
 
           {/* SMM Services Selector Explorer */}
-          <div className="bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg relative">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyber-blue"></div>
+          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
             
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border pb-3 mb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border pb-4 mb-4">
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Services Database Explorer
+                Service Catalog
               </h2>
               {/* Category selector & search bar */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <select
-                  className="bg-cyber-input border border-cyber-border rounded px-2.5 py-1.5 text-[10px] font-mono text-slate-200 focus:outline-none focus:border-cyber-blue"
+                  className="bg-cyber-input border border-cyber-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyber-blue transition-all"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   disabled={loadingServices}
                 >
                   {categories.map((c) => (
                     <option key={c} value={c}>
-                      {c.substring(0, 30)}
+                      {c.substring(0, 35)}
                     </option>
                   ))}
                 </select>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-slate-500" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Search service/ID..."
-                    className="bg-cyber-input border border-cyber-border rounded pl-8 pr-2.5 py-1.5 text-[10px] font-mono text-slate-200 focus:outline-none focus:border-cyber-blue w-40"
+                    placeholder="Search services..."
+                    className="bg-cyber-input border border-cyber-border rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyber-blue w-44 transition-all"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     disabled={loadingServices}
@@ -649,43 +694,43 @@ export default function MultiOrderPage() {
             </div>
 
             {loadingServices ? (
-              <div className="text-center py-10 font-mono text-xs text-slate-500 animate-pulse">
-                PARSING SMM SERVICES CATALOG...
+              <div className="text-center py-12 text-sm text-slate-450 animate-pulse">
+                Loading SMM service catalog...
               </div>
             ) : fetchError ? (
-              <div className="p-3 bg-cyber-red/10 border border-cyber-red/30 rounded text-cyber-red text-xs text-center font-mono">
-                [CATALOG FAULT]: {fetchError}
+              <div className="p-4 bg-cyber-red/10 border border-cyber-red/20 rounded-lg text-cyber-red text-xs text-center">
+                [Error Loading Catalog]: {fetchError}
               </div>
             ) : filteredServices.length === 0 ? (
-              <div className="text-center py-8 text-xs text-slate-500 font-mono">
-                NO MATCHING SERVICES FOUND.
+              <div className="text-center py-10 text-xs text-slate-500">
+                No matching services found.
               </div>
             ) : (
-              <div className="max-h-[350px] overflow-y-auto border border-cyber-border rounded bg-cyber-bg/40 divide-y divide-cyber-border">
+              <div className="max-h-[350px] overflow-y-auto border border-cyber-border rounded-lg bg-cyber-bg/40 divide-y divide-cyber-border">
                 {filteredServices.map((s) => (
                   <div 
                     key={s.service} 
-                    className="p-3 flex items-center justify-between hover:bg-cyber-input/30 transition-colors"
+                    className="p-3.5 flex items-center justify-between hover:bg-slate-800/10 transition-colors"
                   >
-                    <div className="space-y-0.5 pr-4 flex-1">
+                    <div className="space-y-1 pr-4 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-cyber-blue font-bold">#{s.service}</span>
-                        <span className="text-[10px] bg-cyber-border text-slate-400 px-1.5 py-0.5 rounded font-mono font-bold text-[8px] uppercase">
+                        <span className="text-xs text-cyber-blue font-semibold font-mono">#{s.service}</span>
+                        <span className="text-[9px] bg-cyber-border text-slate-400 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
                           {s.type}
                         </span>
                       </div>
                       <h4 className="text-xs text-white font-bold leading-normal">{s.name}</h4>
-                      <p className="text-[9px] text-slate-500">
-                        Rate: <span className="text-cyber-green">${s.rate}/1k</span> | Min: {s.min} | Max: {s.max}
+                      <p className="text-[11px] text-slate-500 font-mono">
+                        Rate: <span className="text-cyber-green font-semibold">${s.rate}/1k</span> | Min: {s.min} | Max: {s.max}
                       </p>
                     </div>
                     <button
                       onClick={() => addToCampaign(s)}
-                      className="bg-cyber-blue/10 hover:bg-cyber-blue hover:text-black border border-cyber-blue/30 hover:border-transparent px-2.5 py-1 rounded text-[10px] text-cyber-blue font-bold flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                      className="bg-cyber-blue/10 hover:bg-cyber-blue hover:text-white border border-cyber-blue/30 hover:border-transparent px-3 py-1.5 rounded-lg text-xs text-cyber-blue font-bold flex items-center gap-1 cursor-pointer transition-all shrink-0"
                       disabled={executing}
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      ADD
+                      <Plus className="w-4 h-4" />
+                      Add
                     </button>
                   </div>
                 ))}
@@ -696,24 +741,24 @@ export default function MultiOrderPage() {
         </div>
 
         {/* Right Side: Active campaign Console Logger (4 cols) */}
-        <div className="lg:col-span-4 bg-cyber-card border border-cyber-border rounded-lg p-5 font-mono flex flex-col justify-between shadow-2xl h-[400px] lg:h-[600px] sticky top-6">
+        <div className="lg:col-span-4 bg-cyber-card border border-cyber-border rounded-xl p-6 flex flex-col justify-between shadow-2xl h-[400px] lg:h-[600px] sticky top-6">
           <div className="flex flex-col h-full justify-between">
             <div>
-              <div className="flex items-center justify-between border-b border-cyber-border pb-2.5 mb-3">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-cyber-green animate-pulse" />
-                  <span className="text-[10px] font-bold text-slate-400 tracking-wider">CAMPAIGN-LOGS.SH</span>
+              <div className="flex items-center justify-between border-b border-cyber-border pb-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <Activity className="w-4.5 h-4.5 text-cyber-green animate-pulse" />
+                  <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">Campaign Execution Status</span>
                 </div>
                 {consoleLogs.length > 1 && (
                   <button 
-                    onClick={() => setConsoleLogs(["CONSOLE CLEARED. ENGINE STANDBY..."])}
-                    className="text-[8px] text-slate-500 hover:text-slate-300 uppercase font-bold"
+                    onClick={() => setConsoleLogs(["Logs cleared. Ready."])}
+                    className="text-xs text-slate-500 hover:text-slate-355 uppercase font-semibold transition-all"
                   >
-                    Clear Logs
+                    Clear
                   </button>
                 )}
               </div>
-              <div className="space-y-2 text-[10px] leading-relaxed overflow-y-auto max-h-[280px] lg:max-h-[460px] pr-1 scrollbar-thin">
+              <div className="space-y-2 text-xs leading-relaxed overflow-y-auto max-h-[280px] lg:max-h-[460px] pr-1 text-slate-400">
                 {consoleLogs.map((log, idx) => (
                   <div key={idx} className="terminal-line text-slate-300">
                     {log}
@@ -722,9 +767,9 @@ export default function MultiOrderPage() {
               </div>
             </div>
             
-            <div className="border-t border-cyber-border pt-3 mt-3 text-[9px] text-slate-500 shrink-0">
-              <p>CAMPAIGN BATCH: <span className="text-cyber-purple font-bold">READY</span></p>
-              <p>BUFFER STACK: <span className="text-cyber-green font-bold">{campaignItems.length} SERVICES QUEUED</span></p>
+            <div className="border-t border-cyber-border pt-4 mt-4 text-xs text-slate-550 shrink-0 space-y-1 font-semibold">
+              <p>Status: <span className="text-cyber-purple uppercase">Ready</span></p>
+              <p>Selected: <span className="text-cyber-green">{campaignItems.length} services in basket</span></p>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Key, Eye, EyeOff, ShieldCheck, ShieldAlert, Sparkles, Terminal } from "lucide-react";
+import { Key, Eye, EyeOff, ShieldCheck, Sparkles, Activity } from "lucide-react";
 
 export default function SettingsPage() {
   const { apiKey, updateUserApiKey } = useAuth();
@@ -11,7 +11,7 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
-    "READY TO SYNC API GATEWAY...",
+    "Ready to sync SMM API key.",
   ]);
 
   const addLog = (log: string) => {
@@ -23,12 +23,12 @@ export default function SettingsPage() {
     if (!inputKey.trim()) {
       setStatus("error");
       setErrorMessage("API key cannot be empty");
-      addLog("[ERROR] FAILED TO SAVE: EMPTY KEY PACKET.");
+      addLog("[Error] Failed to save: API key cannot be empty.");
       return;
     }
 
     setStatus("testing");
-    addLog(`[PING] TESTING CREDENTIAL HANDSHAKE WITH SMM PANEL SERVER...`);
+    addLog(`[Request] Verifying SMM API credentials...`);
     setErrorMessage("");
 
     try {
@@ -42,61 +42,61 @@ export default function SettingsPage() {
       const data = await res.json();
 
       if (data && data.balance !== undefined) {
-        addLog(`[HANDSHAKE SUCCESS] CURRENT BALANCE DETECTED: $${data.balance} ${data.currency}`);
-        addLog(`[FIRESTORE WRITE] SYNCING API KEY SECURELY TO CLOUD STORE...`);
+        addLog(`[Success] Verified. Account balance detected: $${data.balance} ${data.currency}`);
+        addLog(`[Sync] Storing SMM API key securely...`);
         
         await updateUserApiKey(inputKey.trim());
         
-        addLog(`[SYNC COMPLETE] NODE LINK ESTABLISHED.`);
+        addLog(`[Success] SMM API configuration updated successfully.`);
         setStatus("success");
       } else {
         const errMsg = data?.error || "Key validation failed (unauthorized).";
-        addLog(`[HANDSHAKE REJECTED] SERVER REPLIED: ${errMsg}`);
+        addLog(`[Error] Verification failed: ${errMsg}`);
         setStatus("error");
         setErrorMessage(errMsg);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      addLog(`[FATAL ERROR] API CONNECTOR TERMINATED UNEXPECTEDLY.`);
+      addLog(`[Error] Connection terminated unexpectedly.`);
       setStatus("error");
       setErrorMessage("Network error occurred. Try again.");
     }
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl font-sans">
       {/* Title */}
       <div>
-        <h1 className="text-2xl font-black text-white tracking-wider flex items-center gap-2">
-          API GATEWAY CONFIGURATION
+        <h1 className="text-2xl font-extrabold text-white tracking-wide flex items-center gap-2">
+          API Configuration
         </h1>
-        <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest">
-          Establish encrypted communication links to BuzzPlusSMM servers
+        <p className="text-sm text-slate-450 mt-1">
+          Configure your SMM panel API key to fetch balance, view catalog, and place orders.
         </p>
       </div>
 
       <div className="grid md:grid-cols-5 gap-6">
         {/* Settings form card */}
-        <div className="md:col-span-3 bg-cyber-card border border-cyber-border rounded-lg p-6 relative overflow-hidden shadow-2xl">
+        <div className="md:col-span-3 bg-cyber-card border border-cyber-border rounded-xl p-6 relative overflow-hidden shadow-2xl">
           {/* Top visual helper */}
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyber-blue"></div>
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
 
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Key className="w-4 h-4 text-cyber-blue" />
-            BuzzPlusSMM Credentials
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
+            <Key className="w-5 h-5 text-cyber-blue" />
+            API Credentials
           </h2>
 
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block">
-                Your Private API Token
+          <form onSubmit={handleSave} className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Private API Key
               </label>
               <div className="relative">
                 <input
                   type={showKey ? "text" : "password"}
                   required
-                  placeholder="Paste your API key here..."
-                  className="w-full bg-cyber-input border border-cyber-border rounded px-4 py-2.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyber-blue transition-all pr-10"
+                  placeholder="Paste your SMM API key here..."
+                  className="w-full bg-cyber-input/60 border border-cyber-border rounded-lg px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-cyber-blue transition-all pr-11"
                   value={inputKey}
                   onChange={(e) => setInputKey(e.target.value)}
                   disabled={status === "testing"}
@@ -104,44 +104,43 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 transition-colors"
                 >
                   {showKey ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 pt-1 leading-normal">
-                Never share this token. It is stored securely on Firestore DB under your authenticated identity and sent only from Next.js server context to prevent sniffing.
+              <p className="text-xs text-slate-500 pt-1 leading-relaxed">
+                Your key is stored securely in Firestore and is only proxied server-side to protect your SMM panel credentials.
               </p>
             </div>
 
             {status === "success" && (
-              <div className="p-3 bg-cyber-green/10 border border-cyber-green/30 rounded text-cyber-green text-xs flex items-center gap-2 font-mono">
-                <ShieldCheck className="w-4 h-4 shrink-0" />
-                <span>LINK SECURED: API KEY SYNCED AND VALIDATED.</span>
+              <div className="p-3.5 bg-cyber-green/10 border border-cyber-green/20 rounded-lg text-cyber-green text-xs flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 shrink-0" />
+                <span>API key successfully validated and saved.</span>
               </div>
             )}
 
             {status === "error" && (
-              <div className="p-3 bg-cyber-red/10 border border-cyber-red/30 rounded text-cyber-red text-xs flex items-center gap-2 font-mono">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>[GATEWAY ERROR]: {errorMessage}</span>
+              <div className="p-3.5 bg-cyber-red/10 border border-cyber-red/20 rounded-lg text-cyber-red text-xs flex items-center gap-2">
+                <span>Error: {errorMessage}</span>
               </div>
             )}
 
             <button
               type="submit"
               disabled={status === "testing"}
-              className="bg-cyber-blue hover:bg-cyber-blue hover:shadow-[0_0_15px_rgba(0,240,255,0.25)] text-black font-extrabold text-xs py-2 px-4 rounded tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              className="bg-cyber-blue hover:bg-cyber-blue/90 text-white font-bold text-sm py-2.5 px-5 rounded-lg transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
             >
               {status === "testing" ? (
                 <>
-                  <div className="h-3 w-3 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                  LINKING GATEWAY...
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Validating Key...
                 </>
               ) : (
                 <>
-                  VALIDATE & SAVE LINK
-                  <Sparkles className="w-3.5 h-3.5" />
+                  Validate & Save Key
+                  <Sparkles className="w-4.5 h-4.5" />
                 </>
               )}
             </button>
@@ -149,24 +148,24 @@ export default function SettingsPage() {
         </div>
 
         {/* Sync Console status */}
-        <div className="md:col-span-2 bg-cyber-card border border-cyber-border rounded-lg p-5 font-mono flex flex-col justify-between shadow-2xl h-[280px] md:h-auto">
+        <div className="md:col-span-2 bg-cyber-card border border-cyber-border rounded-xl p-6 flex flex-col justify-between shadow-2xl h-[280px] md:h-auto">
           <div>
-            <div className="flex items-center gap-2 border-b border-cyber-border pb-2 mb-3">
-              <Terminal className="w-4 h-4 text-cyber-blue animate-pulse" />
-              <span className="text-[10px] font-bold text-slate-400 tracking-wider">GATEWAY-BRIDGE.LOG</span>
+            <div className="flex items-center gap-2.5 border-b border-cyber-border pb-3 mb-3">
+              <Activity className="w-4.5 h-4.5 text-cyber-blue animate-pulse" />
+              <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">Sync Activity Log</span>
             </div>
-            <div className="space-y-1.5 text-[10px] leading-relaxed overflow-y-auto max-h-[220px] pr-1">
+            <div className="space-y-2 text-xs leading-relaxed overflow-y-auto max-h-[220px] pr-1 text-slate-400">
               {consoleLogs.map((log, idx) => (
-                <div key={idx} className="terminal-line text-slate-300">
+                <div key={idx} className="terminal-line text-slate-300 font-sans">
                   {log}
                 </div>
               ))}
             </div>
           </div>
           
-          <div className="border-t border-cyber-border pt-2.5 mt-3 text-[9px] text-slate-500">
-            <p>FIREBASE DB: <span className="text-cyber-green font-bold">CONNECTED</span></p>
-            <p>CREDENTIAL CLOUD BACKUP: <span className="text-cyber-purple font-bold">ACTIVE</span></p>
+          <div className="border-t border-cyber-border pt-3 mt-3 text-xs text-slate-500 space-y-0.5 font-semibold">
+            <p>Database: <span className="text-cyber-green">Connected</span></p>
+            <p>Backup: <span className="text-cyber-purple">Active</span></p>
           </div>
         </div>
       </div>

@@ -10,7 +10,6 @@ import {
   Settings, 
   LogOut, 
   RefreshCw,
-  Terminal,
   Activity
 } from "lucide-react";
 
@@ -63,7 +62,10 @@ export default function DashboardLayout({
   // Sync balance when API key updates
   useEffect(() => {
     if (apiKey) {
-      fetchBalance();
+      const timer = setTimeout(() => {
+        fetchBalance();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [apiKey, fetchBalance]);
 
@@ -85,23 +87,23 @@ export default function DashboardLayout({
 
   if (loading || !user) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-cyber-bg font-mono text-cyber-green">
+      <div className="flex h-screen w-screen items-center justify-center bg-cyber-bg font-sans text-cyber-purple">
         <div className="text-center space-y-4">
-          <div className="h-10 w-10 border-2 border-cyber-green border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="animate-pulse">DECRYPTING ACCESS SHELL...</p>
+          <div className="h-12 w-12 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="animate-pulse text-base tracking-wide text-slate-300">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   const navItems = [
-    { name: "Terminal Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Multi-Order Deck", path: "/dashboard/order", icon: Layers },
-    { name: "Node API Settings", path: "/dashboard/settings", icon: Settings },
+    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Place Orders", path: "/dashboard/order", icon: Layers },
+    { name: "API Configuration", path: "/dashboard/settings", icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen w-full flex bg-cyber-bg text-slate-300 font-mono relative scanlines">
+    <div className="min-h-screen w-full flex bg-cyber-bg text-slate-300 font-sans relative">
       {/* Sidebar */}
       <aside className="w-64 bg-cyber-card border-r border-cyber-border flex flex-col justify-between z-10 shrink-0">
         <div>
@@ -109,28 +111,28 @@ export default function DashboardLayout({
           <div className="h-16 flex items-center px-6 border-b border-cyber-border justify-between">
             <Link href="/dashboard" className="flex items-center gap-2">
               <span className="text-lg font-black tracking-widest text-white">
-                BUZZ<span className="text-cyber-green glow-green">SHADOW</span>
+                BuzzPlus<span className="text-cyber-purple glow-purple font-medium">SMM</span>
               </span>
             </Link>
-            <div className="flex items-center gap-1.5 bg-cyber-green/10 border border-cyber-green/20 px-2 py-0.5 rounded text-[9px] text-cyber-green font-bold uppercase animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyber-green"></span>
-              LIVE
+            <div className="flex items-center gap-1.5 bg-cyber-green/10 border border-cyber-green/20 px-2 py-0.5 rounded text-[10px] text-cyber-green font-semibold uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-pulse"></span>
+              Live
             </div>
           </div>
 
           {/* User profile & API info card */}
           <div className="p-4 border-b border-cyber-border bg-cyber-bg/40">
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">
-              Active Access Deck
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 font-bold">
+              Account Email
             </div>
-            <div className="text-xs font-bold text-white truncate mb-2">
+            <div className="text-sm font-semibold text-slate-200 truncate mb-3">
               {user.email}
             </div>
 
             {/* SMM Balance Display */}
-            <div className="bg-cyber-input border border-cyber-border rounded p-3 mt-2 flex flex-col relative overflow-hidden">
-              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex justify-between items-center mb-1">
-                SMM PANEL BALANCE
+            <div className="bg-cyber-input border border-cyber-border rounded-lg p-3.5 flex flex-col relative overflow-hidden">
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex justify-between items-center mb-1">
+                SMM Panel Balance
                 {apiKey && (
                   <button
                     onClick={fetchBalance}
@@ -138,32 +140,32 @@ export default function DashboardLayout({
                     className="text-cyber-blue hover:text-cyber-green transition-colors disabled:opacity-50"
                     title="Refresh Balance"
                   >
-                    <RefreshCw className={`w-3 h-3 ${balanceLoading ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${balanceLoading ? "animate-spin" : ""}`} />
                   </button>
                 )}
               </div>
 
               {apiKey ? (
                 apiError ? (
-                  <div className="text-[10px] text-cyber-red font-bold">
-                    [ API KEY REJECTED ]
+                  <div className="text-xs text-cyber-red font-semibold">
+                    API Key Rejected
                   </div>
                 ) : balance !== null ? (
-                  <div className="text-base font-extrabold text-cyber-green glow-green flex items-baseline gap-1">
+                  <div className="text-lg font-bold text-cyber-green glow-green flex items-baseline gap-1">
                     $ {balance}
-                    <span className="text-[9px] text-slate-400 font-normal">{currency}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">{currency}</span>
                   </div>
                 ) : (
                   <div className="text-xs text-slate-500 animate-pulse">
-                    LOADING BALANCE...
+                    Loading balance...
                   </div>
                 )
               ) : (
                 <Link
                   href="/dashboard/settings"
-                  className="text-[10px] text-cyber-red font-bold hover:underline"
+                  className="text-xs text-cyber-red font-semibold hover:underline"
                 >
-                  [ KEY CONFIGURE REQUIRED ]
+                  Configure API Key
                 </Link>
               )}
             </div>
@@ -178,16 +180,16 @@ export default function DashboardLayout({
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs transition-all relative border border-transparent ${
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-all relative border border-transparent ${
                     isActive
-                      ? "bg-cyber-green/5 text-cyber-green border-cyber-green/10"
+                      ? "bg-cyber-purple/10 text-cyber-purple border-cyber-purple/20 font-medium"
                       : "hover:bg-cyber-input hover:text-white"
                   }`}
                 >
                   {isActive && (
-                    <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-cyber-green rounded-r"></span>
+                    <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-cyber-purple rounded-r"></span>
                   )}
-                  <Icon className={`w-4 h-4 ${isActive ? "text-cyber-green" : "text-slate-400 group-hover:text-white"}`} />
+                  <Icon className={`w-4.5 h-4.5 ${isActive ? "text-cyber-purple" : "text-slate-400 group-hover:text-white"}`} />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -198,20 +200,20 @@ export default function DashboardLayout({
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-cyber-border space-y-2">
           {/* Live system state */}
-          <div className="flex items-center justify-between text-[9px] text-slate-500 px-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 px-3">
             <span className="flex items-center gap-1.5">
-              <Activity className="w-3 h-3 text-cyber-blue animate-pulse" />
-              NODE PROXIES
+              <Activity className="w-3.5 h-3.5 text-cyber-blue" />
+              System Status
             </span>
-            <span className="text-cyber-green font-bold">ONLINE</span>
+            <span className="text-cyber-green font-semibold">Online</span>
           </div>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded text-xs text-cyber-red hover:bg-cyber-red/10 border border-transparent hover:border-cyber-red/20 transition-all cursor-pointer"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-cyber-red hover:bg-cyber-red/10 border border-transparent hover:border-cyber-red/20 transition-all cursor-pointer"
           >
-            <LogOut className="w-4 h-4 text-cyber-red" />
-            <span>DISCONNECT NODE</span>
+            <LogOut className="w-4.5 h-4.5 text-cyber-red" />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
@@ -219,15 +221,15 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto bg-cyber-bg relative z-10">
         {/* Top Header info */}
-        <header className="h-16 border-b border-cyber-border px-8 flex items-center justify-between shrink-0 bg-cyber-card/20 backdrop-blur-sm">
+        <header className="h-16 border-b border-cyber-border px-8 flex items-center justify-between shrink-0 bg-cyber-card/25 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <Terminal className="w-4 h-4 text-cyber-green" />
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-              SYSTEM CONSOLE // {pathname.replace("/dashboard", "").replace("/", "") || "MAIN"}
+            <Activity className="w-4 h-4 text-cyber-purple" />
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+              SMM Panel // {pathname.replace("/dashboard", "").replace("/", "").toUpperCase() || "OVERVIEW"}
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 font-mono">
-            IP: <span className="text-cyber-blue">127.0.0.1</span> | SECURE TUNNEL
+          <div className="text-xs text-slate-500 font-medium">
+            Connection Secure
           </div>
         </header>
 

@@ -29,8 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let unsubscribeDoc: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
       
       if (currentUser) {
         // Set up real-time listener for user profile in Firestore
@@ -51,21 +58,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Realtime listener
-        const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
+        unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             setApiKey(docSnap.data()?.apiKey || "");
           }
         });
 
         setLoading(false);
-        return () => unsubscribeDoc();
       } else {
         setApiKey(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+      }
+    };
   }, []);
 
   const signUpUser = async (email: string, password: string) => {
