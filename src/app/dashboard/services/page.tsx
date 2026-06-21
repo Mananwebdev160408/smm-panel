@@ -159,7 +159,7 @@ export default function ServicesPage() {
                       <div className="font-semibold text-white mb-0.5">{s.name}</div>
                       <div className="text-xs text-slate-500">{s.category}</div>
                     </td>
-                    <td className="py-4 px-6 font-semibold text-cyber-green">${Number(s.rate).toFixed(3)}</td>
+                    <td className="py-4 px-6 font-semibold text-cyber-green">₹{Number(s.rate).toFixed(3)}</td>
                     <td className="py-4 px-6 text-slate-400 font-mono text-xs">
                       {s.min} <span className="text-slate-600 px-1">/</span> {s.max}
                     </td>

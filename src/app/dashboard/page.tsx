@@ -277,7 +277,7 @@ export default function DashboardPage() {
       if (data && !data.error) {
         setCheckResult(data);
         addCheckLog(
-          `[Success] Status: ${data.status} | Remaining: ${data.remains} | Cost: $${data.charge}`,
+          `[Success] Status: ${data.status} | Remaining: ${data.remains} | Cost: ₹${data.charge}`,
         );
       } else {
         const errMsg =
@@ -566,7 +566,7 @@ export default function DashboardPage() {
             Total Charges
           </span>
           <span className="text-3xl font-bold text-white mt-2">
-            ${totalSpent}
+            ₹{totalSpent}
           </span>
         </div>
       </div>
@@ -664,7 +664,7 @@ export default function DashboardPage() {
                           </td>
                           {/* Cost */}
                           <td className="py-4 px-3 text-right text-cyber-green font-semibold">
-                            ${Number(order.charge).toFixed(4)}
+                            ₹{Number(order.charge).toFixed(4)}
                           </td>
                           {/* Status badge */}
                           <td className="py-4 px-3 text-center">
@@ -755,7 +755,7 @@ export default function DashboardPage() {
                             Cost
                           </div>
                           <div className="text-cyber-green font-mono font-semibold mt-0.5">
-                            ${Number(order.charge).toFixed(4)}
+                            ₹{Number(order.charge).toFixed(4)}
                           </div>
                         </div>
                         <div>
@@ -870,7 +870,7 @@ export default function DashboardPage() {
 
                   <div>Charge Rate:</div>
                   <div className="text-cyber-green font-bold">
-                    ${checkResult.charge} {checkResult.currency}
+                    ₹{checkResult.charge} {checkResult.currency}
                   </div>
 
                   <div>Start Count:</div>

@@ -33,7 +33,7 @@ export default function DashboardLayout({
   }, []);
 
   const [balance, setBalance] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<string>("USD");
+  const [currency, setCurrency] = useState<string>("INR");
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [apiError, setApiError] = useState(false);
 
@@ -54,7 +54,7 @@ export default function DashboardLayout({
       const data = await res.json();
       if (data && data.balance) {
         setBalance(Number(data.balance).toFixed(2));
-        setCurrency(data.currency || "USD");
+        setCurrency(data.currency || "INR");
       } else if (data && data.error) {
         console.error("Balance fetch API error:", data.error);
         setApiError(true);
@@ -167,7 +167,7 @@ export default function DashboardLayout({
                   </div>
                 ) : balance !== null ? (
                   <div className="text-xl font-semibold text-white flex items-baseline gap-1">
-                    ${balance}
+                    ₹{balance}
                     <span className="text-xs text-slate-500 font-normal ml-0.5">
                       {currency}
                     </span>
@@ -251,7 +251,7 @@ export default function DashboardLayout({
             {/* On mobile: SMM Balance indicator */}
             {apiKey && balance !== null && (
               <div className="lg:hidden text-xs bg-cyber-input border border-cyber-border rounded px-2.5 py-1 text-cyber-green font-bold flex items-center gap-1">
-                <span>$ {balance}</span>
+                <span>₹ {balance}</span>
               </div>
             )}
 

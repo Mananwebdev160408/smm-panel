@@ -42,7 +42,7 @@ export default function SettingsPage() {
       const data = await res.json();
 
       if (data && data.balance !== undefined) {
-        addLog(`[Success] Verified. Account balance detected: $${data.balance} ${data.currency}`);
+        addLog(`[Success] Verified. Account balance detected: ₹${data.balance} ${data.currency}`);
         addLog(`[Sync] Storing SMM API key securely...`);
         
         await updateUserApiKey(inputKey.trim());
