@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       }
     }
 
-    console.log(`[API PROXY] Routing action "${action}" to NextWaveSMM`);
+    console.log(`[API PROXY] Routing action "${action}" to NextWave SMM`);
 
     const response = await fetch("https://buzzplussmm.com/api/v2", {
       method: "POST",

@@ -16,7 +16,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "NextWave // SMM Terminal",
+  title: "NextWave SMM | Dashboard",
   description: "Advanced Multi-Order SMM Control Center",
   manifest: "/manifest.json",
   appleWebApp: {
