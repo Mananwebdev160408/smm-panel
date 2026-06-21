@@ -18,7 +18,7 @@ export default function AuthPage() {
 
   // Status logs for system info panel
   const [systemLogs, setSystemLogs] = useState<string[]>([
-    "Welcome to NextWaveSMM",
+    "Welcome to NextWave SMM",
     "Connecting to platform services...",
   ]);
 
@@ -120,10 +120,10 @@ export default function AuthPage() {
 
           <div className="text-center md:text-left mb-6">
             <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center justify-center md:justify-start gap-1">
-              NextWave<span className="bg-cyber-purple text-black px-2 py-0.5 rounded font-black ml-1 text-2xl tracking-tighter uppercase shadow-sm">SMM</span>
+              NextWave <span className="bg-cyber-purple text-black px-2 py-0.5 rounded font-black ml-1 text-2xl tracking-tighter uppercase shadow-sm">SMM</span>
             </h1>
             <p className="text-sm text-slate-400 mt-1.5">
-              NextWaveSMM Platform
+              NextWave SMM Platform
             </p>
           </div>
 
