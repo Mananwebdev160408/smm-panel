@@ -125,7 +125,7 @@ export default function DashboardLayout({
           <div className="h-16 flex items-center px-6 border-b border-cyber-border justify-between">
             <Link href="/dashboard" className="flex items-center gap-2">
               <span className="text-lg font-bold tracking-tight text-white">
-                NextWaveSMM
+                NextWave SMM
               </span>
             </Link>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] text-slate-400 font-medium bg-slate-800/50">
@@ -235,7 +235,7 @@ export default function DashboardLayout({
           {/* On mobile: show Brand logo */}
           <div className="flex items-center gap-1 lg:hidden">
             <span className="text-base font-bold tracking-tight text-white">
-              NextWaveSMM
+              NextWave SMM
             </span>
           </div>
 

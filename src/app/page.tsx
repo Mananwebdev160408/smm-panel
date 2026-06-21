@@ -109,7 +109,7 @@ export default function AuthPage() {
           
           <div className="border-t border-cyber-border pt-4 mt-4 text-xs text-slate-500 space-y-1">
             <p>Platform Version: <span className="text-cyber-blue font-semibold">v2.0.0</span></p>
-            <p>API Endpoint: <span className="text-cyber-green font-semibold">buzzplussmm.com</span></p>
+            <p>API Endpoint: <span className="text-cyber-green font-semibold">api.nextwavesmm.com</span></p>
           </div>
         </div>
 
