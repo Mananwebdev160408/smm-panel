@@ -1,0 +1,18 @@
+{
+  "name": "BuzzPlus SMM Panel",
+  "short_name": "BuzzPlus",
+  "description": "Advanced Multi-Order SMM Control Center",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

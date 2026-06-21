@@ -10,16 +10,34 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import toast from "react-hot-toast";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { useRouter } from "next/navigation";
 import {
   Activity,
-  Search,
   RefreshCw,
-  Compass,
-  Clock,
+  Package,
   ShieldCheck,
   ExternalLink,
+  XCircle,
+  Download,
+  Repeat,
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface OrderLog {
@@ -40,6 +58,7 @@ interface OrderLog {
 
 export default function DashboardPage() {
   const { apiKey, user } = useAuth();
+  const router = useRouter();
 
   // Database orders
   const [orders, setOrders] = useState<OrderLog[]>([]);
@@ -56,7 +75,7 @@ export default function DashboardPage() {
   } | null>(null);
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkLogs, setCheckLogs] = useState<string[]>([
-    "Ready. Enter an SMM Order ID to check status.",
+    "Ready to check order status.",
   ]);
 
   const addCheckLog = (log: string) => {
@@ -65,6 +84,138 @@ export default function DashboardPage() {
 
   // Sync state for individual orders
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  // Selection state for bulk actions
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  // Pagination & Filtering
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Auto-sync timer ref
+  useEffect(() => {
+    if (!apiKey || orders.length === 0) return;
+    
+    const interval = setInterval(() => {
+      const pendingOrders = orders.filter(
+        (o) => o.status.toLowerCase() === "pending" || o.status.toLowerCase() === "in progress" || o.status.toLowerCase() === "processing"
+      );
+      
+      if (pendingOrders.length > 0) {
+        const smmIds = pendingOrders.map((o) => o.smmOrderId).join(",");
+        fetch("/api/smm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "status", key: apiKey, orders: smmIds }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && !data.error) {
+              pendingOrders.forEach(async (order) => {
+                const statusData = data[order.smmOrderId];
+                if (statusData && !statusData.error && statusData.status !== order.status) {
+                  const docRef = doc(db, "orders", order.id);
+                  await updateDoc(docRef, {
+                    status: statusData.status || order.status,
+                    charge: statusData.charge || order.charge,
+                    remains: Number(statusData.remains) || order.remains,
+                  });
+                }
+              });
+            }
+          })
+          .catch(console.error);
+      }
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [apiKey, orders]);
+
+  // Derived state for filtering and pagination
+  const filteredOrders = orders.filter((o) => {
+    const matchStatus = statusFilter === "All" || o.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchSearch = searchQuery === "" || 
+                        o.serviceName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        String(o.smmOrderId).includes(searchQuery) ||
+                        (o.link && o.link.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchStatus && matchSearch;
+  });
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const exportCSV = () => {
+    if (filteredOrders.length === 0) {
+      toast.error("No orders to export");
+      return;
+    }
+    const headers = ["Date", "SMM Order ID", "Service", "Link", "Quantity", "Charge", "Status"];
+    const rows = filteredOrders.map(o => [
+      o.createdAt ? new Date(o.createdAt.seconds * 1000).toLocaleString() : "-",
+      o.smmOrderId,
+      `"${o.serviceName.replace(/"/g, '""')}"`,
+      `"${o.link}"`,
+      o.quantity,
+      o.charge,
+      o.status
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `smm_orders_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Exported CSV successfully!");
+  };
+
+  const getChartData = () => {
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return d.toISOString().slice(0, 10);
+    }).reverse();
+
+    const dataMap: Record<string, number> = {};
+    last7Days.forEach(d => dataMap[d] = 0);
+
+    orders.forEach(o => {
+      if (o.createdAt) {
+        const dateStr = new Date(o.createdAt.seconds * 1000).toISOString().slice(0, 10);
+        if (dataMap[dateStr] !== undefined) {
+          dataMap[dateStr] += Number(o.charge) || 0;
+        }
+      }
+    });
+
+    return Object.entries(dataMap).map(([date, spend]) => ({
+      date: date.slice(5), // MM-DD
+      spend: Number(spend.toFixed(2))
+    }));
+  };
+
+
+  const handleSelectAll = () => {
+    if (paginatedOrders.every(o => selectedOrders.includes(o.id))) {
+      setSelectedOrders(selectedOrders.filter(id => !paginatedOrders.find(o => o.id === id)));
+    } else {
+      const newSelection = [...selectedOrders];
+      paginatedOrders.forEach(o => {
+        if (!newSelection.includes(o.id)) newSelection.push(o.id);
+      });
+      setSelectedOrders(newSelection);
+    }
+  };
+
+  const handleSelectOrder = (id: string) => {
+    setSelectedOrders((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   // Real-time listener for user orders from Firestore
   useEffect(() => {
@@ -199,17 +350,144 @@ export default function DashboardPage() {
       const data = await res.json();
 
       if (data && data.refill) {
-        alert(`Refill request placed successfully. Refill ID: ${data.refill}`);
+        toast.success(`Refill request placed successfully. Refill ID: ${data.refill}`);
+        if (user) {
+          await addDoc(collection(db, "refills"), {
+            userId: user.uid,
+            smmOrderId: order.smmOrderId,
+            refillId: data.refill,
+            status: "Pending",
+            serviceName: order.serviceName,
+            createdAt: serverTimestamp(),
+          });
+        }
       } else {
-        alert(
-          `Refill request failed: ${data?.error || "Not supported for this service."}`,
-        );
+        toast.error(`Refill request failed: ${data?.error || "Not supported"}`);
       }
     } catch (err) {
       console.error("Refill error:", err);
-      alert("Refill bridge timed out.");
+      toast.error("Refill bridge timed out.");
     } finally {
       setSyncingId(null);
+    }
+  };
+
+  const triggerCancel = async (order: OrderLog) => {
+    if (!apiKey) return;
+    if (!confirm(`Are you sure you want to cancel Order #${order.smmOrderId}?`)) return;
+
+    setSyncingId(order.id);
+    try {
+      const res = await fetch("/api/smm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "cancel",
+          key: apiKey,
+          orders: String(order.smmOrderId),
+        }),
+      });
+      const data = await res.json();
+      
+      let success = false;
+      if (Array.isArray(data)) {
+        const result = data.find((item: { order: string | number; [key: string]: unknown }) => String(item.order) === String(order.smmOrderId));
+        if (result && result.cancel && !(result.cancel as { error?: string }).error) {
+          success = true;
+        }
+      } else if (data && !data.error) {
+        success = true;
+      }
+
+      if (success) {
+        toast.success("Order cancelled successfully.");
+        const docRef = doc(db, "orders", order.id);
+        await updateDoc(docRef, { status: "Canceled" });
+      } else {
+        toast.error("Cancel request failed or not supported.");
+      }
+    } catch (err) {
+      console.error("Cancel error:", err);
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const handleBulkSync = async () => {
+    if (!apiKey || selectedOrders.length === 0) return;
+    setBulkProcessing(true);
+    const selected = orders.filter((o) => selectedOrders.includes(o.id));
+    const smmIds = selected.map((o) => o.smmOrderId).join(",");
+    
+    try {
+      const res = await fetch("/api/smm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status", key: apiKey, orders: smmIds }),
+      });
+      const data = await res.json();
+      
+      if (data && !data.error) {
+        for (const order of selected) {
+          const statusData = data[order.smmOrderId];
+          if (statusData && !statusData.error) {
+            const docRef = doc(db, "orders", order.id);
+            await updateDoc(docRef, {
+              status: statusData.status || order.status,
+              charge: statusData.charge || order.charge,
+              remains: Number(statusData.remains) || order.remains,
+            });
+          }
+        }
+        toast.success("Bulk sync complete.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBulkProcessing(false);
+      setSelectedOrders([]);
+    }
+  };
+
+  const handleBulkRefill = async () => {
+    if (!apiKey || selectedOrders.length === 0) return;
+    setBulkProcessing(true);
+    const selected = orders.filter((o) => selectedOrders.includes(o.id));
+    const smmIds = selected.map((o) => o.smmOrderId).join(",");
+    
+    try {
+      const res = await fetch("/api/smm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refill", key: apiKey, orders: smmIds }),
+      });
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        let count = 0;
+        for (const order of selected) {
+          const result = data.find((item: { order: string | number; [key: string]: unknown }) => String(item.order) === String(order.smmOrderId));
+          if (result && result.refill && !(result.refill as { error?: string }).error) {
+            if (user) {
+              await addDoc(collection(db, "refills"), {
+                userId: user.uid,
+                smmOrderId: order.smmOrderId,
+                refillId: result.refill,
+                status: "Pending",
+                serviceName: order.serviceName,
+                createdAt: serverTimestamp(),
+              });
+              count++;
+            }
+          }
+        }
+        toast.success(`Requested refills for ${count} orders successfully.`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBulkProcessing(false);
+      setSelectedOrders([]);
     }
   };
 
@@ -261,46 +539,34 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 font-sans">
       {/* Stats Tickers Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Stat card 1 */}
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 bottom-0 bg-cyber-green"></div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="bg-cyber-card p-5 flex flex-col justify-between">
+          <span className="text-sm font-medium text-slate-400">
             Total Orders
           </span>
-          <span className="text-3xl font-extrabold text-white mt-1.5">
+          <span className="text-3xl font-bold text-white mt-2">
             {totalOrders}
-          </span>
-          <span className="text-xs text-slate-500 mt-2">
-            Synced with database history
           </span>
         </div>
 
         {/* Stat card 2 */}
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 bottom-0 bg-cyber-purple"></div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="bg-cyber-card p-5 flex flex-col justify-between">
+          <span className="text-sm font-medium text-slate-400">
             Active Campaigns
           </span>
-          <span className="text-3xl font-extrabold text-white mt-1.5">
+          <span className="text-3xl font-bold text-white mt-2">
             {uniqueBatches}
-          </span>
-          <span className="text-xs text-slate-500 mt-2">
-            Batched campaign orders executed
           </span>
         </div>
 
         {/* Stat card 3 */}
-        <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1.5 bottom-0 bg-cyber-blue"></div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="bg-cyber-card p-5 flex flex-col justify-between">
+          <span className="text-sm font-medium text-slate-400">
             Total Charges
           </span>
-          <span className="text-3xl font-extrabold text-cyber-purple glow-purple mt-1.5">
-            $ {totalSpent}
-          </span>
-          <span className="text-xs text-slate-500 mt-2">
-            All-time API budget spent
+          <span className="text-3xl font-bold text-white mt-2">
+            ${totalSpent}
           </span>
         </div>
       </div>
@@ -308,14 +574,12 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-12 gap-6 items-start">
         {/* Left: Orders history Table (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-purple"></div>
-
-            <div className="flex items-center justify-between border-b border-cyber-border pb-4 mb-5">
-              <h2 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Clock className="w-5 h-5 text-cyber-purple" />
-                Recent SMM Orders
+          <div className="bg-cyber-card p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-cyber-border pb-4 mb-5 gap-4">
+              <h2 className="text-base font-semibold text-white">
+                Recent Orders
               </h2>
+
             </div>
 
             {loadingOrders ? (
@@ -324,14 +588,10 @@ export default function DashboardPage() {
               </div>
             ) : orders.length === 0 ? (
               <div className="text-center py-16 space-y-4">
-                <Compass className="w-12 h-12 text-slate-550 mx-auto" />
-                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
-                  No Orders Found
+                <Package className="w-12 h-12 text-slate-600 mx-auto" />
+                <h3 className="text-sm font-medium text-slate-300">
+                  No orders yet
                 </h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  You haven&apos;t placed any SMM orders yet. Head over to the
-                  Place Orders tab to launch your first SMM campaign.
-                </p>
               </div>
             ) : (
               <>
@@ -340,6 +600,9 @@ export default function DashboardPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-cyber-border text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-3">
+                          <input type="checkbox" className="accent-cyber-purple cursor-pointer" checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedOrders.includes(o.id))} onChange={handleSelectAll} />
+                        </th>
                         <th className="py-3 px-3">DATE</th>
                         <th className="py-3 px-3">CAMPAIGN</th>
                         <th className="py-3 px-3">SMM ID</th>
@@ -352,11 +615,15 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-cyber-border/40 text-slate-300">
-                      {orders.map((order) => (
+                      {paginatedOrders.map((order) => (
                         <tr
                           key={order.id}
-                          className="hover:bg-slate-800/20 transition-colors"
+                          className={`hover:bg-slate-800/20 transition-colors ${selectedOrders.includes(order.id) ? 'bg-cyber-purple/5' : ''}`}
                         >
+                          {/* Checkbox */}
+                          <td className="py-4 px-3">
+                            <input type="checkbox" className="accent-cyber-purple cursor-pointer" checked={selectedOrders.includes(order.id)} onChange={() => handleSelectOrder(order.id)} />
+                          </td>
                           {/* Date */}
                           <td className="py-4 px-3 text-slate-400 whitespace-nowrap">
                             {order.createdAt
@@ -434,15 +701,16 @@ export default function DashboardPage() {
 
                 {/* Mobile View Cards */}
                 <div className="block md:hidden space-y-4">
-                  {orders.map((order) => (
+                  {paginatedOrders.map((order) => (
                     <div
                       key={order.id}
                       className="bg-cyber-input/40 border border-cyber-border rounded-xl p-4 space-y-3 shadow-lg relative overflow-hidden"
                     >
                       {/* Top bar with ID, Date, and Campaign */}
                       <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-semibold uppercase tracking-wider pb-2 border-b border-cyber-border/40">
-                        <div>
-                          ID:{" "}
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" className="accent-cyber-purple cursor-pointer" checked={selectedOrders.includes(order.id)} onChange={() => handleSelectOrder(order.id)} />
+                          <span>ID:{" "}</span>
                           <span className="text-white">
                             #{order.smmOrderId}
                           </span>
@@ -529,6 +797,21 @@ export default function DashboardPage() {
                             <ShieldCheck className="w-3 h-3" />
                             Refill
                           </button>
+                          <button
+                            onClick={() => triggerCancel(order)}
+                            disabled={syncingId === order.id}
+                            className="bg-cyber-red/10 hover:bg-cyber-red/20 text-cyber-red border border-cyber-red/20 rounded px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Cancel Order"
+                          >
+                            <XCircle className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => router.push(`/dashboard/order?reorderService=${order.serviceId}&reorderLink=${encodeURIComponent(order.link)}`)}
+                            className="bg-cyber-purple/10 hover:bg-cyber-purple/20 text-cyber-purple border border-cyber-purple/20 rounded px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Quick Reorder"
+                          >
+                            <Repeat className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -539,13 +822,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right: Live ID Status checker (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
           {/* Status Check card */}
-          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
-            <h2 className="text-base font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-              <Search className="w-5 h-5 text-cyber-blue" />
+          <div className="bg-cyber-card p-6">
+            <h2 className="text-base font-semibold text-white mb-5">
               Check Order Status
             </h2>
 
@@ -606,24 +886,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Live Checker logs console */}
-          <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg h-[240px] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5 border-b border-cyber-border pb-3 mb-3">
-                <Activity className="w-4.5 h-4.5 text-cyber-blue animate-pulse" />
-                <span className="text-xs font-semibold text-slate-350 tracking-wider uppercase">
-                  Inquiry Activity Log
-                </span>
-              </div>
-              <div className="space-y-2 text-xs leading-relaxed overflow-y-auto max-h-[130px] pr-1 text-slate-400">
-                {checkLogs.map((log, idx) => (
-                  <div key={idx} className="terminal-line text-slate-300">
-                    {log}
-                  </div>
-                ))}
-              </div>
+          <div className="bg-cyber-card p-5 h-[240px] flex flex-col">
+            <div className="border-b border-cyber-border pb-3 mb-3">
+              <span className="text-sm font-semibold text-slate-200">
+                Recent Checks
+              </span>
             </div>
-            <div className="text-[10px] text-slate-550 text-right pt-2 border-t border-cyber-border">
-              Gateway Route: /api/smm
+            <div className="space-y-3 text-xs overflow-y-auto max-h-[160px] pr-1 text-slate-400">
+              {checkLogs.map((log, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <span className="text-slate-500">•</span>
+                  <span>{log}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

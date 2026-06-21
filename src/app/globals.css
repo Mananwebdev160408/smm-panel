@@ -1,83 +1,148 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cyber-bg: #000000;
-  --color-cyber-card: #151515;
-  --color-cyber-border: #262626;
-  --color-cyber-input: #1b1b1b;
+  /* Boxy corners override - 0px everywhere */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+
+  /* Map to dynamic CSS variables for Dark/Light Mode */
+  --color-cyber-bg: var(--bg-main);
+  --color-cyber-card: var(--bg-card);
+  --color-cyber-border: var(--border-main);
+  --color-cyber-input: var(--bg-input);
+
+  /* Overriding hardcoded tailwind text colors for theme support */
+  --color-white: var(--text-white);
+  --color-slate-200: var(--text-200);
+  --color-slate-300: var(--text-300);
+  --color-slate-400: var(--text-400);
+  --color-slate-450: var(--text-400);
+  --color-slate-500: var(--text-500);
+  --color-slate-550: var(--text-500);
+  --color-slate-600: var(--text-500);
   
-  --color-cyber-green: #F7971D;
-  --color-cyber-green-dim: #ff9900;
-  --color-cyber-purple: #F7971D;
-  --color-cyber-blue: #ff9900;
-  --color-cyber-red: #f43f5e;
-  --color-cyber-yellow: #F7971D;
+  /* Semantic Professional Colors */
+  --color-cyber-blue: #3b82f6;
+  --color-cyber-purple: #6366f1;
+  --color-cyber-green: #10b981;
+  --color-cyber-green-dim: #059669;
+  --color-cyber-red: #ef4444;
+  --color-cyber-yellow: #f59e0b;
   
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-bricolage);
+  --font-mono: var(--font-bricolage);
 }
 
+/* Light Theme (Default) */
 :root {
-  --background: #000000;
-  --foreground: #f1f5f9;
+  --bg-main: #f4f4f5; /* Zinc 100 */
+  --bg-card: #ffffff; /* White */
+  --border-main: #e4e4e7; /* Zinc 200 */
+  --bg-input: #ffffff;
+  
+  --text-white: #09090b; /* Zinc 950 */
+  --text-200: #18181b; /* Zinc 900 */
+  --text-300: #27272a; /* Zinc 800 */
+  --text-400: #52525b; /* Zinc 600 */
+  --text-500: #71717a; /* Zinc 500 */
+}
+
+/* Dark Theme */
+.dark {
+  --bg-main: #09090b; /* Zinc 950 */
+  --bg-card: #18181b; /* Zinc 900 */
+  --border-main: #27272a; /* Zinc 800 */
+  --bg-input: #27272a;
+  
+  --text-white: #ffffff;
+  --text-200: #e2e8f0;
+  --text-300: #cbd5e1;
+  --text-400: #94a3b8;
+  --text-500: #64748b;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-white);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Modern smooth scrollbar */
+/* Professional elegant scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
-  border-radius: 4px;
+  background: var(--text-400);
+  border-radius: 0px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #F7971D;
+  background: var(--text-500);
 }
 
-/* Subtle modern text glow/shadows */
-.glow-green {
-  text-shadow: 0 0 12px rgba(247, 151, 29, 0.35);
-}
-.glow-purple {
-  text-shadow: 0 0 12px rgba(247, 151, 29, 0.35);
-}
-.glow-blue {
-  text-shadow: 0 0 12px rgba(255, 153, 0, 0.35);
+/* Stripped all glows and cyberpunk shadows */
+.glow-green, .glow-purple, .glow-blue {
+  text-shadow: none !important;
 }
 
-.border-glow-green:hover {
-  border-color: #F7971D;
-  box-shadow: 0 0 15px rgba(247, 151, 29, 0.15);
-}
-.border-glow-purple:hover {
-  border-color: #F7971D;
-  box-shadow: 0 0 15px rgba(247, 151, 29, 0.15);
-}
-.border-glow-blue:hover {
-  border-color: #ff9900;
-  box-shadow: 0 0 15px rgba(255, 153, 0, 0.15);
+.border-glow-green:hover, .border-glow-purple:hover, .border-glow-blue:hover {
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
-/* Clean log indicators */
+/* Clean standard list bullet instead of terminal dash */
 .terminal-line::before {
-  content: "• ";
-  color: #F7971D;
-  font-weight: bold;
+  content: "•"; 
+  color: var(--text-500);
+  font-weight: 400;
+  margin-right: 8px;
 }
 
-/* Clean, modern radial background helper instead of matrix grid */
-.cyber-grid {
-  background-image: radial-gradient(rgba(247, 151, 29, 0.05) 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
+button {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 0 !important;
+}
+
+.bg-cyber-card > .absolute.bg-cyber-green,
+.bg-cyber-card > .absolute.bg-cyber-purple,
+.bg-cyber-card > .absolute.bg-cyber-blue,
+.bg-cyber-card > .absolute.bg-cyber-red,
+.bg-cyber-card > .absolute.bg-cyber-yellow {
+  display: none !important;
+}
+
+.bg-cyber-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-main) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+  border-radius: 0 !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+.bg-cyber-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  transform: translateY(-1px);
+}
+
+.bg-cyber-input {
+  border: 1px solid var(--border-main) !important;
+  background-color: var(--bg-input) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.15s ease;
+  border-radius: 0 !important;
+  color: var(--text-200) !important;
+}
+.bg-cyber-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 1px #3b82f6 !important;
+  outline: none !important;
 }

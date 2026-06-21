@@ -11,6 +11,8 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import toast from "react-hot-toast";
+import { useSearchParams } from "next/navigation";
 import {
   Layers,
   Plus,
@@ -40,6 +42,7 @@ interface CampaignItem {
   service: SMMService;
   // Field values depending on type
   quantity?: number;
+  customLink?: string;
   comments?: string;
   usernames?: string;
   username?: string;
@@ -53,11 +56,12 @@ let idCounter = 0;
 
 export default function MultiOrderPage() {
   const { apiKey, user } = useAuth();
+  const searchParams = useSearchParams();
 
   // SMM Panel Services
   const [services, setServices] = useState<SMMService[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingServices, setLoadingServices] = useState(false);
   const [fetchError, setFetchError] = useState("");
@@ -70,14 +74,53 @@ export default function MultiOrderPage() {
     "Campaign creator ready. Please enter a target link.",
   ]);
 
+
+  // Quick Reorder logic
+  useEffect(() => {
+    const reorderServiceId = searchParams?.get("reorderService");
+    const reorderLink = searchParams?.get("reorderLink");
+
+    if (reorderServiceId && services.length > 0) {
+      const sId = Number(reorderServiceId);
+      const srv = services.find((s) => s.service === sId);
+      if (srv) {
+        // Prevent duplicate auto-add if already exists
+        const exists = campaignItems.some((item) => item.service.service === sId);
+        if (!exists) {
+          const newItem: CampaignItem = {
+            id: `${srv.service}-${++idCounter}`,
+            service: srv,
+            quantity: Number(srv.min) || 100,
+            comments: "",
+            usernames: "",
+            username: "",
+            answer_number: "1",
+            dripEnabled: false,
+            runs: 10,
+            interval: 60,
+            customLink: reorderLink || "",
+          };
+          setCampaignItems((prev) => [...prev, newItem]);
+          toast.success(`Auto-added ${srv.name} for reorder.`);
+        }
+      } else {
+        toast.error("Reorder service not found in catalog.");
+      }
+    }
+  }, [searchParams, services]);
+
   const addLog = (log: string) => {
     setConsoleLogs((prev) => [...prev, log]);
   };
 
-  const clampQty = (qty: any, minStr: string, maxStr: string): number => {
+  const clampQty = (
+    qty: number | string | undefined,
+    minStr: string,
+    maxStr: string,
+  ): number => {
     const minVal = Number(minStr) || 10;
     const maxVal = Number(maxStr) || Infinity;
-    let val = Number(qty);
+    const val = Number(qty || 0);
     if (isNaN(val) || val < minVal) return minVal;
     if (val > maxVal) return maxVal;
     return val;
@@ -175,25 +218,13 @@ export default function MultiOrderPage() {
         }
 
         if (useCache) {
-          // Filter for Instagram services only (case-insensitive with Unicode normalization and word boundary boundaries)
-          const igData = cachedData.filter((s: SMMService) => {
-            if (!s.category) return false;
-            let normalized = s.category.normalize("NFKD").toLowerCase();
-            normalized = normalized.replace(/i̇/g, "i").replace(/ı/g, "i");
-            if (normalized.includes("instagram")) return true;
-            const igRegex = /\big\b/i;
-            return igRegex.test(normalized);
-          });
-          setServices(igData);
+          setServices(cachedData);
           const cats = Array.from(
             new Set(
-              igData.map((s: SMMService) => s.category || "Uncategorized"),
+              cachedData.map((s: SMMService) => s.category || "Uncategorized"),
             ),
           ) as string[];
           setCategories(cats.sort());
-          if (cats.length > 0) {
-            setSelectedCategory(cats[0]);
-          }
           setLoadingServices(false);
           return;
         }
@@ -207,26 +238,14 @@ export default function MultiOrderPage() {
         const data = await res.json();
 
         if (Array.isArray(data)) {
-          // Filter for Instagram services only (case-insensitive with Unicode normalization and word boundary boundaries)
-          const igData = data.filter((s: SMMService) => {
-            if (!s.category) return false;
-            let normalized = s.category.normalize("NFKD").toLowerCase();
-            normalized = normalized.replace(/i̇/g, "i").replace(/ı/g, "i");
-            if (normalized.includes("instagram")) return true;
-            const igRegex = /\big\b/i;
-            return igRegex.test(normalized);
-          });
-          setServices(igData);
+          setServices(data);
           // Extract unique categories
           const cats = Array.from(
             new Set(
-              igData.map((s: SMMService) => s.category || "Uncategorized"),
+              data.map((s: SMMService) => s.category || "Uncategorized"),
             ),
           ) as string[];
           setCategories(cats.sort());
-          if (cats.length > 0) {
-            setSelectedCategory(cats[0]);
-          }
 
           // Save to Firestore Cache asynchronously without blocking UI update
           try {
@@ -292,17 +311,26 @@ export default function MultiOrderPage() {
     );
   }
 
-  // Filter services by Category and Search query
+  // Filter services by selected categories (multi) and search query
   const filteredServices = services.filter((s) => {
-    const matchesCat = selectedCategory
-      ? s.category === selectedCategory
-      : true;
+    const matchesCat =
+      selectedCategories.length === 0
+        ? true
+        : selectedCategories.includes(s.category || "Uncategorized");
     const matchesSearch = searchQuery
       ? s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.service.toString().includes(searchQuery)
       : true;
     return matchesCat && matchesSearch;
   });
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const clearCategories = () => setSelectedCategories([]);
 
   const addToCampaign = (service: SMMService) => {
     const newItem: CampaignItem = {
@@ -316,6 +344,7 @@ export default function MultiOrderPage() {
       dripEnabled: false,
       runs: 10,
       interval: 60,
+      customLink: "",
     };
     setCampaignItems((prev) => [...prev, newItem]);
     addLog(`Added: ${service.name} (#${service.service})`);
@@ -369,12 +398,12 @@ export default function MultiOrderPage() {
   const handleExecuteCampaign = async () => {
     if (!targetLink.trim()) {
       addLog("Error: Target link cannot be empty.");
-      alert("Please provide a target link URL.");
+      toast.error("Please provide a target link URL.");
       return;
     }
     if (campaignItems.length === 0) {
       addLog("Error: Basket is empty.");
-      alert("Please add at least one service to your campaign.");
+      toast.error("Please add at least one service to your campaign.");
       return;
     }
 
@@ -468,15 +497,15 @@ export default function MultiOrderPage() {
     }
 
     addLog(
-      `Summary: Finished. Success: ${successCount}, Failed: ${failedCount}`,
+`Summary: Finished. Success: ${successCount}, Failed: ${failedCount}`,
     );
     setExecuting(false);
 
     if (successCount > 0) {
       setCampaignItems([]);
-      alert(`Campaign Complete! Placed ${successCount} orders successfully.`);
+      toast.success(`Campaign Complete! Placed ${successCount} orders successfully.`);
     } else {
-      alert("Campaign Execution failed. Check the terminal logs on the right.");
+      toast.error("Campaign Execution failed. Check the terminal logs on the right.");
     }
   };
 
@@ -934,36 +963,62 @@ export default function MultiOrderPage() {
           <div className="bg-cyber-card border border-cyber-border rounded-xl p-6 shadow-lg relative">
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-cyber-blue"></div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border pb-4 mb-4">
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Service Catalog
-              </h2>
-              {/* Category selector & search bar */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <select
-                  className="bg-cyber-input border border-cyber-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyber-blue transition-all"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  disabled={loadingServices}
-                >
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c.substring(0, 35)}
-                    </option>
-                  ))}
-                </select>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search services..."
-                    className="bg-cyber-input border border-cyber-border rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyber-blue w-44 transition-all"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    disabled={loadingServices}
-                  />
+            <div className="flex flex-col gap-4 border-b border-cyber-border pb-4 mb-4">
+              {/* Top row: title + search */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Service Catalog
+                  </h2>
+                  {selectedCategories.length > 0 && (
+                    <span className="bg-cyber-purple/20 text-cyber-purple text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {filteredServices.length} results
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Search services..."
+                      className="bg-cyber-input border border-cyber-border rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyber-blue w-48 transition-all"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      disabled={loadingServices}
+                    />
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <button
+                      onClick={clearCategories}
+                      className="text-[10px] font-bold text-slate-400 hover:text-cyber-red uppercase tracking-wider transition-colors px-2 py-1 border border-cyber-border rounded hover:border-cyber-red/30"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               </div>
+              {/* Multi-select category chips */}
+              {!loadingServices && categories.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto pr-1">
+                  {categories.map((cat) => {
+                    const active = selectedCategories.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => toggleCategory(cat)}
+                        className={`text-[10px] font-semibold px-2.5 py-1 rounded transition-all whitespace-nowrap border ${
+                          active
+                            ? "bg-cyber-purple text-white border-cyber-purple"
+                            : "bg-cyber-input text-slate-400 border-cyber-border hover:border-cyber-blue/40 hover:text-slate-200"
+                        }`}
+                      >
+                        {cat.length > 28 ? cat.substring(0, 28) + "…" : cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {loadingServices ? (

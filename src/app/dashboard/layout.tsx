@@ -10,8 +10,12 @@ import {
   Settings,
   LogOut,
   RefreshCw,
-  Activity,
+  List,
+  RotateCw,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function DashboardLayout({
   children,
@@ -21,6 +25,12 @@ export default function DashboardLayout({
   const { user, apiKey, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [balance, setBalance] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string>("USD");
@@ -99,9 +109,11 @@ export default function DashboardLayout({
   }
 
   const navItems = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Place Orders", path: "/dashboard/order", icon: Layers },
-    { name: "API Configuration", path: "/dashboard/settings", icon: Settings },
+    { name: "Dashboard", shortName: "Home", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Place Orders", shortName: "Orders", path: "/dashboard/order", icon: Layers },
+    { name: "Services Catalog", shortName: "Services", path: "/dashboard/services", icon: List },
+    { name: "Refill Logs", shortName: "Refills", path: "/dashboard/refills", icon: RotateCw },
+    { name: "API Configuration", shortName: "API", path: "/dashboard/settings", icon: Settings, hideOnMobile: true },
   ];
 
   return (
@@ -111,33 +123,29 @@ export default function DashboardLayout({
         <div>
           {/* Brand header */}
           <div className="h-16 flex items-center px-6 border-b border-cyber-border justify-between">
-            <Link href="/dashboard" className="flex items-center gap-1">
-              <span className="text-lg font-extrabold tracking-tight text-white">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <span className="text-lg font-bold tracking-tight text-white">
                 BuzzPlus
-                <span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">
-                  SMM
-                </span>
               </span>
             </Link>
-            <div className="flex items-center gap-1.5 bg-cyber-green/10 border border-cyber-green/20 px-2 py-0.5 rounded text-[10px] text-cyber-green font-semibold uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-pulse"></span>
-              Live
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] text-slate-400 font-medium bg-slate-800/50">
+              Workspace
             </div>
           </div>
 
           {/* User profile & API info card */}
-          <div className="p-4 border-b border-cyber-border bg-cyber-bg/40">
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 font-bold">
-              Account Email
+          <div className="p-5 border-b border-cyber-border bg-cyber-bg/20">
+            <div className="text-[11px] text-slate-500 font-medium mb-1">
+              Signed in as
             </div>
-            <div className="text-sm font-semibold text-slate-200 truncate mb-3">
+            <div className="text-sm font-medium text-slate-200 truncate mb-4">
               {user.email}
             </div>
 
             {/* SMM Balance Display */}
-            <div className="bg-cyber-input border border-cyber-border rounded-lg p-3.5 flex flex-col relative overflow-hidden">
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex justify-between items-center mb-1">
-                SMM Panel Balance
+            <div className="bg-cyber-bg border border-cyber-border rounded-lg p-4 flex flex-col relative overflow-hidden">
+              <div className="text-xs text-slate-400 font-medium flex justify-between items-center mb-1.5">
+                Current Balance
                 {apiKey && (
                   <button
                     onClick={fetchBalance}
@@ -158,14 +166,14 @@ export default function DashboardLayout({
                     API Key Rejected
                   </div>
                 ) : balance !== null ? (
-                  <div className="text-lg font-bold text-cyber-green glow-green flex items-baseline gap-1">
-                    $ {balance}
-                    <span className="text-[10px] text-slate-400 font-normal">
+                  <div className="text-xl font-semibold text-white flex items-baseline gap-1">
+                    ${balance}
+                    <span className="text-xs text-slate-500 font-normal ml-0.5">
                       {currency}
                     </span>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-500 animate-pulse">
+                  <div className="text-xs text-slate-500">
                     Loading balance...
                   </div>
                 )
@@ -226,23 +234,15 @@ export default function DashboardLayout({
         <header className="h-16 border-b border-cyber-border px-4 lg:px-8 flex items-center justify-between shrink-0 bg-cyber-card/25 backdrop-blur-sm">
           {/* On mobile: show Brand logo */}
           <div className="flex items-center gap-1 lg:hidden">
-            <span className="text-base font-extrabold tracking-tight text-white">
+            <span className="text-base font-bold tracking-tight text-white">
               BuzzPlus
-              <span className="bg-cyber-purple text-black px-1.5 py-0.5 rounded font-black ml-1 text-xs tracking-tighter uppercase shadow-sm">
-                SMM
-              </span>
             </span>
           </div>
 
           {/* On desktop: show Breadcrumb */}
-          <div className="hidden lg:flex items-center gap-3">
-            <Activity className="w-4 h-4 text-cyber-purple" />
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-              SMM Panel //{" "}
-              {pathname
-                .replace("/dashboard", "")
-                .replace("/", "")
-                .toUpperCase() || "OVERVIEW"}
+          <div className="hidden lg:flex items-center gap-2">
+            <span className="text-sm text-slate-400 font-medium capitalize">
+              {pathname === "/dashboard" ? "Overview" : pathname.replace("/dashboard/", "").replace("-", " ")}
             </span>
           </div>
 
@@ -255,6 +255,26 @@ export default function DashboardLayout({
               </div>
             )}
 
+            {/* Theme Toggle Button */}
+            {mounted && (
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="p-2 text-slate-400 hover:text-white hover:bg-cyber-input rounded-lg border border-transparent transition-all cursor-pointer"
+                title="Toggle Theme"
+              >
+                {theme === "dark" ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5 text-slate-800" />}
+              </button>
+            )}
+
+            {/* On mobile: Settings Icon Button */}
+            <Link
+              href="/dashboard/settings"
+              className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-cyber-input rounded-lg border border-transparent transition-all"
+              title="Settings"
+            >
+              <Settings className="w-4.5 h-4.5" />
+            </Link>
+
             {/* On mobile: Sign Out Icon Button */}
             <button
               onClick={handleLogout}
@@ -264,9 +284,7 @@ export default function DashboardLayout({
               <LogOut className="w-4.5 h-4.5" />
             </button>
 
-            <div className="hidden lg:block text-xs text-slate-500 font-medium">
-              Connection Secure
-            </div>
+            {/* Removed Fake "Connection Secure" */}
           </div>
         </header>
 
@@ -275,8 +293,8 @@ export default function DashboardLayout({
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-cyber-card border-t border-cyber-border flex items-center justify-around z-50 backdrop-blur-md bg-opacity-95">
-        {navItems.map((item) => {
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-cyber-card border-t border-cyber-border flex items-center justify-around z-50 backdrop-blur-md bg-opacity-95 px-1">
+        {navItems.filter(item => !item.hideOnMobile).map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.path;
           return (
@@ -293,7 +311,7 @@ export default function DashboardLayout({
                 className={`w-5 h-5 ${isActive ? "text-cyber-purple" : "text-slate-400"}`}
               />
               <span className="text-[10px] tracking-wide font-semibold">
-                {item.name}
+                {item.shortName}
               </span>
             </Link>
           );
