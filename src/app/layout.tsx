@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BuzzPlus",
+    title: "NextWaveSMM",
   },
 };
 

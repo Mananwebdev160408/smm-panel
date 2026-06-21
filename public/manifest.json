@@ -1,6 +1,6 @@
 {
-  "name": "BuzzPlus SMM Panel",
-  "short_name": "BuzzPlus",
+  "name": "NextWave SMM Panel",
+  "short_name": "NextWave SMM",
   "description": "Advanced Multi-Order SMM Control Center",
   "start_url": "/",
   "display": "standalone",
