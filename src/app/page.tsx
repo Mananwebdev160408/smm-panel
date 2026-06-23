@@ -18,8 +18,8 @@ export default function AuthPage() {
 
   // Status logs for system info panel
   const [systemLogs, setSystemLogs] = useState<string[]>([
-    "Initializing secure session...",
-    "Connecting API gateways...",
+    "Welcome to NextWave SMM",
+    "Connecting to platform services...",
   ]);
 
   useEffect(() => {
@@ -30,9 +30,9 @@ export default function AuthPage() {
 
   useEffect(() => {
     const logs = [
-      "Optimizing network routes...",
-      "Syncing SMM catalog configurations...",
-      "Secure connection established. Ready.",
+      "Loading dashboard configuration...",
+      "Connecting to SMM providers...",
+      "Ready.",
     ];
     let i = 0;
     const interval = setInterval(() => {
@@ -52,7 +52,7 @@ export default function AuthPage() {
       <div className="flex h-screen w-screen items-center justify-center bg-cyber-bg font-sans text-cyber-purple">
         <div className="text-center space-y-4">
           <div className="h-12 w-12 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="animate-pulse text-base tracking-wide text-slate-300">Setting up secure session...</p>
+          <p className="animate-pulse text-base tracking-wide text-slate-300">Loading Dashboard...</p>
         </div>
       </div>
     );
@@ -96,7 +96,7 @@ export default function AuthPage() {
           <div>
             <div className="flex items-center gap-2.5 border-b border-cyber-border pb-3 mb-4">
               <Activity className="w-5 h-5 text-cyber-purple animate-pulse" />
-              <span className="text-xs font-semibold tracking-wider text-slate-300 uppercase">System Status</span>
+              <span className="text-xs font-semibold tracking-wider text-slate-300 uppercase">System Logs</span>
             </div>
             <div className="space-y-2.5 text-xs text-slate-400 overflow-y-auto max-h-[300px] pr-1 leading-relaxed">
               {systemLogs.map((log, idx) => (
@@ -109,7 +109,7 @@ export default function AuthPage() {
           
           <div className="border-t border-cyber-border pt-4 mt-4 text-xs text-slate-500 space-y-1">
             <p>Platform Version: <span className="text-cyber-blue font-semibold">v2.0.0</span></p>
-            <p>API Endpoint: <span className="text-cyber-green font-semibold">buzzplussmm.com</span></p>
+            <p>API Endpoint: <span className="text-cyber-green font-semibold">api.nextwavesmm.com</span></p>
           </div>
         </div>
 
@@ -120,10 +120,10 @@ export default function AuthPage() {
 
           <div className="text-center md:text-left mb-6">
             <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center justify-center md:justify-start gap-1">
-              BuzzPlus<span className="bg-cyber-purple text-black px-2 py-0.5 rounded font-black ml-1 text-2xl tracking-tighter uppercase shadow-sm">SMM</span>
+              NextWave <span className="bg-cyber-purple text-black px-2 py-0.5 rounded font-black ml-1 text-2xl tracking-tighter uppercase shadow-sm">SMM</span>
             </h1>
             <p className="text-sm text-slate-400 mt-1.5">
-              Secure SMM Campaign Management Platform
+              NextWave SMM Platform
             </p>
           </div>
 

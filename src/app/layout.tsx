@@ -16,13 +16,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "BUZZ // SMM Terminal",
+  title: "NextWave SMM | Dashboard",
   description: "Advanced Multi-Order SMM Control Center",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BuzzPlus",
+    title: "NextWave SMM",
   },
 };
 
