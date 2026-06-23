@@ -52,8 +52,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    const responseText = await response.text();
+    if (!responseText || responseText.trim() === "") {
+      console.error("[API PROXY ERROR] Received empty response from BuzzPlusSMM");
+      return NextResponse.json(
+        { error: "API returned an empty response" },
+        { status: 502 }
+      );
+    }
+
+    try {
+      const data = JSON.parse(responseText);
+      return NextResponse.json(data);
+    } catch (parseError) {
+      console.error("[API PROXY ERROR] Failed to parse JSON response. Raw body:", responseText);
+      return NextResponse.json(
+        { 
+          error: "API returned invalid JSON response",
+          details: responseText.slice(0, 500)
+        },
+        { status: 502 }
+      );
+    }
   } catch (error: unknown) {
     console.error("[API PROXY FATAL ERROR]:", error);
     const errMsg = error instanceof Error ? error.message : "Internal server error";
